@@ -1,0 +1,136 @@
+package cl.pagoflex.pagos.service;
+
+import cl.pagoflex.pagos.dto.PagoRequestDTO;
+import cl.pagoflex.pagos.dto.PagoResponseDTO;
+import cl.pagoflex.pagos.exception.PagoDuplicadoException;
+import cl.pagoflex.pagos.exception.PagoNotFoundException;
+import cl.pagoflex.pagos.exception.PagoOperacionException;
+import cl.pagoflex.pagos.model.EstadoPago;
+import cl.pagoflex.pagos.model.Pago;
+import cl.pagoflex.pagos.repository.PagoRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@Transactional
+public class PagoServiceImpl implements PagoService {
+
+    private final PagoRepository pagoRepository;
+
+    public PagoServiceImpl(PagoRepository pagoRepository) {
+        this.pagoRepository = pagoRepository;
+    }
+
+    @Override
+    public PagoResponseDTO registrar(PagoRequestDTO request) {
+        if (pagoRepository.existsByCompromisoIdAndEstado(request.getCompromisoId(), EstadoPago.EXITOSO)) {
+            throw new PagoDuplicadoException("El compromiso ya tiene un pago EXITOSO");
+        }
+
+        Pago pago = new Pago();
+        pago.setCompromisoId(request.getCompromisoId());
+        pago.setUsuarioId(request.getUsuarioId());
+        pago.setEmpresaId(request.getEmpresaId());
+        pago.setMonto(request.getMonto());
+        pago.setMetodoPago(request.getMetodoPago());
+        pago.setDescripcion(request.getDescripcion());
+        pago.setFechaPago(LocalDateTime.now());
+        pago.setEstado(EstadoPago.PENDIENTE);
+        pago.setReferenciaTransaccion(generarReferenciaUnica());
+        return PagoResponseDTO.desde(pagoRepository.save(pago));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PagoResponseDTO> listarTodos() {
+        return pagoRepository.findAll().stream().map(PagoResponseDTO::desde).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PagoResponseDTO buscarPorId(Long id) {
+        return PagoResponseDTO.desde(obtenerPago(id));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PagoResponseDTO> buscarPorUsuario(Long usuarioId) {
+        return pagoRepository.findByUsuarioId(usuarioId).stream().map(PagoResponseDTO::desde).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PagoResponseDTO> buscarPorEmpresa(Long empresaId) {
+        return pagoRepository.findByEmpresaId(empresaId).stream().map(PagoResponseDTO::desde).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PagoResponseDTO> buscarPorCompromiso(Long compromisoId) {
+        return pagoRepository.findByCompromisoId(compromisoId).stream().map(PagoResponseDTO::desde).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PagoResponseDTO> buscarPorEstado(EstadoPago estado) {
+        return pagoRepository.findByEstado(estado).stream().map(PagoResponseDTO::desde).toList();
+    }
+
+    @Override
+    public PagoResponseDTO marcarExitoso(Long id) {
+        Pago pago = obtenerPago(id);
+        if (pago.getEstado() != EstadoPago.PENDIENTE) {
+            throw new PagoOperacionException("Solo se puede marcar como EXITOSO un pago PENDIENTE");
+        }
+        if (pagoRepository.existsByCompromisoIdAndEstado(pago.getCompromisoId(), EstadoPago.EXITOSO)) {
+            throw new PagoDuplicadoException("El compromiso ya tiene un pago EXITOSO");
+        }
+        pago.setEstado(EstadoPago.EXITOSO);
+        return PagoResponseDTO.desde(pagoRepository.save(pago));
+    }
+
+    @Override
+    public PagoResponseDTO rechazar(Long id) {
+        Pago pago = obtenerPago(id);
+        if (pago.getEstado() != EstadoPago.PENDIENTE) {
+            throw new PagoOperacionException("Solo se puede rechazar un pago PENDIENTE");
+        }
+        pago.setEstado(EstadoPago.RECHAZADO);
+        return PagoResponseDTO.desde(pagoRepository.save(pago));
+    }
+
+    @Override
+    public PagoResponseDTO anular(Long id) {
+        Pago pago = obtenerPago(id);
+        if (pago.getEstado() != EstadoPago.PENDIENTE) {
+            throw new PagoOperacionException("Solo se puede anular un pago PENDIENTE");
+        }
+        pago.setEstado(EstadoPago.ANULADO);
+        return PagoResponseDTO.desde(pagoRepository.save(pago));
+    }
+
+    @Override
+    public void eliminar(Long id) {
+        Pago pago = obtenerPago(id);
+        if (pago.getEstado() == EstadoPago.EXITOSO) {
+            throw new PagoOperacionException("No se permite eliminar físicamente un pago EXITOSO");
+        }
+        pagoRepository.delete(pago);
+    }
+
+    private Pago obtenerPago(Long id) {
+        return pagoRepository.findById(id).orElseThrow(() -> new PagoNotFoundException(id));
+    }
+
+    private String generarReferenciaUnica() {
+        String referencia;
+        do {
+            referencia = "PAG-" + UUID.randomUUID();
+        } while (pagoRepository.existsByReferenciaTransaccion(referencia));
+        return referencia;
+    }
+}

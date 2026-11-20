@@ -1,0 +1,143 @@
+package cl.pagoflex.compromisos.service;
+
+import cl.pagoflex.compromisos.dto.CompromisoRequestDTO;
+import cl.pagoflex.compromisos.dto.CompromisoResponseDTO;
+import cl.pagoflex.compromisos.exception.RecursoNoEncontradoException;
+import cl.pagoflex.compromisos.exception.RecursoDuplicadoException;
+import cl.pagoflex.compromisos.exception.SolicitudInvalidaException;
+import cl.pagoflex.compromisos.model.Compromiso;
+import cl.pagoflex.compromisos.model.EstadoCompromiso;
+import cl.pagoflex.compromisos.repository.CompromisoRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class CompromisoServiceTest {
+
+    @Mock
+    private CompromisoRepository repository;
+
+    private CompromisoService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new CompromisoService(repository);
+    }
+
+    @Test
+    void registraYGuardaCompromisoPendiente() {
+        CompromisoRequestDTO request = request();
+        Compromiso guardado = from(request);
+        guardado.setId(1L);
+        when(repository.save(any(Compromiso.class))).thenReturn(guardado);
+
+        CompromisoResponseDTO response = service.registrar(request);
+
+        assertThat(response.getEstado()).isEqualTo(EstadoCompromiso.PENDIENTE);
+        verify(repository).save(any(Compromiso.class));
+    }
+
+    @Test
+    void rechazaMontoInvalido() {
+        CompromisoRequestDTO request = request();
+        request.setMonto(BigDecimal.ZERO);
+        assertThatThrownBy(() -> service.registrar(request))
+                .isInstanceOf(SolicitudInvalidaException.class);
+    }
+
+    @Test
+    void listaBuscaYFiltra() {
+        Compromiso compromiso = from(request());
+        compromiso.setId(1L);
+        when(repository.findAll()).thenReturn(List.of(compromiso));
+        when(repository.buscarVencidos(any(LocalDate.class))).thenReturn(List.of());
+        when(repository.findById(1L)).thenReturn(Optional.of(compromiso));
+        when(repository.findByUsuarioId(10L)).thenReturn(List.of(compromiso));
+        when(repository.findByEmpresaId(20L)).thenReturn(List.of(compromiso));
+        when(repository.findByEstado(EstadoCompromiso.PENDIENTE)).thenReturn(List.of(compromiso));
+
+        assertThat(service.listarTodas()).hasSize(1);
+        assertThat(service.buscarPorId(1L).getId()).isEqualTo(1L);
+        assertThat(service.buscarPorUsuario(10L)).hasSize(1);
+        assertThat(service.buscarPorEmpresa(20L)).hasSize(1);
+        assertThat(service.buscarPorEstado(EstadoCompromiso.PENDIENTE)).hasSize(1);
+    }
+
+    @Test
+    void manejoInexistente() {
+        when(repository.findById(99L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.buscarPorId(99L))
+                .isInstanceOf(RecursoNoEncontradoException.class);
+    }
+
+    @Test
+    void actualizaYMarcaPagado() {
+        Compromiso compromiso = from(request());
+        compromiso.setId(1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(compromiso));
+        when(repository.save(any(Compromiso.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(service.actualizar(1L, request()).getEstado()).isEqualTo(EstadoCompromiso.PENDIENTE);
+        assertThat(service.pagar(1L).getEstado()).isEqualTo(EstadoCompromiso.PAGADO);
+    }
+
+    @Test
+    void cancelarYDetectarVencidos() {
+        Compromiso vencido = from(request());
+        vencido.setId(1L);
+        vencido.setFechaVencimiento(LocalDate.now().minusDays(1));
+        when(repository.buscarVencidos(any(LocalDate.class))).thenReturn(List.of(vencido));
+        when(repository.saveAll(List.of(vencido))).thenReturn(List.of(vencido));
+
+        assertThat(service.actualizarVencidos()).isEqualTo(1);
+        assertThat(vencido.getEstado()).isEqualTo(EstadoCompromiso.VENCIDO);
+    }
+
+    @Test
+    void impideTransicionesInvalidas() {
+        Compromiso cancelado = from(request());
+        cancelado.setEstado(EstadoCompromiso.CANCELADO);
+        Compromiso pagado = from(request());
+        pagado.setEstado(EstadoCompromiso.PAGADO);
+        when(repository.findById(1L)).thenReturn(Optional.of(cancelado));
+        when(repository.findById(2L)).thenReturn(Optional.of(pagado));
+
+        assertThatThrownBy(() -> service.pagar(1L)).isInstanceOf(RecursoDuplicadoException.class);
+        assertThatThrownBy(() -> service.cancelar(2L)).isInstanceOf(RecursoDuplicadoException.class);
+    }
+
+    private CompromisoRequestDTO request() {
+        CompromisoRequestDTO request = new CompromisoRequestDTO();
+        request.setUsuarioId(10L);
+        request.setEmpresaId(20L);
+        request.setDescripcion("Cuota");
+        request.setMonto(new BigDecimal("1000"));
+        request.setFechaVencimiento(LocalDate.now().plusDays(10));
+        return request;
+    }
+
+    private Compromiso from(CompromisoRequestDTO request) {
+        Compromiso compromiso = new Compromiso();
+        compromiso.setUsuarioId(request.getUsuarioId());
+        compromiso.setEmpresaId(request.getEmpresaId());
+        compromiso.setDescripcion(request.getDescripcion());
+        compromiso.setMonto(request.getMonto());
+        compromiso.setFechaVencimiento(request.getFechaVencimiento());
+        compromiso.setEstado(EstadoCompromiso.PENDIENTE);
+        return compromiso;
+    }
+}
