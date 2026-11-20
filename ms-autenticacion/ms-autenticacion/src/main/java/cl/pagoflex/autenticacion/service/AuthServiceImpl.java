@@ -86,7 +86,7 @@ public class AuthServiceImpl implements AuthService {
             throw new UsuarioNoEncontradoException();
         }
 
-        String token = jwtService.generarToken(usuario.id(), usuario.correo(), usuario.rol());
+        String token = jwtService.generarToken(usuario.id(), usuario.correo(), usuario.rol(), usuario.empresaId());
         return new AuthResponseDTO(token, "Bearer", jwtService.getExpirationMs(),
                 usuario.id(), usuario.correo(), usuario.rol());
     }

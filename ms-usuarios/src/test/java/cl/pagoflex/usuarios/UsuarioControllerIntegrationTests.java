@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.env.Environment;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
@@ -23,11 +24,28 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 		"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
 		"spring.jpa.hibernate.ddl-auto=create-drop"
 })
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 class UsuarioControllerIntegrationTests {
 
 	@Autowired
+	private Environment environment;
+
+	@Autowired
 	private MockMvc mockMvc;
+
+	@Test
+	void configuraRegistroEureka() {
+		org.assertj.core.api.Assertions.assertThat(environment.getProperty("spring.application.name"))
+				.isEqualTo("ms-usuarios");
+		org.assertj.core.api.Assertions.assertThat(environment.getProperty(
+				"eureka.client.register-with-eureka", Boolean.class)).isTrue();
+		org.assertj.core.api.Assertions.assertThat(environment.getProperty(
+				"eureka.client.fetch-registry", Boolean.class)).isTrue();
+		org.assertj.core.api.Assertions.assertThat(environment.getProperty(
+				"eureka.client.service-url.defaultZone")).isEqualTo("http://localhost:8761/eureka/");
+		org.assertj.core.api.Assertions.assertThat(environment.getProperty(
+				"eureka.instance.prefer-ip-address", Boolean.class)).isTrue();
+	}
 
 	@Test
 	void apiCompletaYDocumentacionOpenApi() throws Exception {

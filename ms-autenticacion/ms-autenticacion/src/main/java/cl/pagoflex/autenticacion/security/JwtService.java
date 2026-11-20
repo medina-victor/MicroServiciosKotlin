@@ -98,15 +98,22 @@ public class JwtService {
     }
 
     public String generarToken(Long usuarioId, String correo, String rol) {
+        return generarToken(usuarioId, correo, rol, null);
+    }
+
+    public String generarToken(Long usuarioId, String correo, String rol, Long empresaId) {
         Instant ahora = Instant.now();
         Instant expiracion = ahora.plus(expirationMs, ChronoUnit.MILLIS);
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claimsBuilder = JwtClaimsSet.builder()
                 .subject(correo)
                 .issuedAt(ahora)
                 .expiresAt(expiracion)
                 .claim("usuarioId", usuarioId)
-                .claim("rol", rol)
-                .build();
+                .claim("rol", rol);
+        if (empresaId != null) {
+            claimsBuilder.claim("empresaId", empresaId);
+        }
+        JwtClaimsSet claims = claimsBuilder.build();
         return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
     }
 

@@ -1,10 +1,14 @@
 package cl.pagoflex.pagos.service;
 
+import cl.pagoflex.pagos.client.CompromisoClient;
+import cl.pagoflex.pagos.client.EmpresaClient;
+import cl.pagoflex.pagos.client.UsuarioClient;
 import cl.pagoflex.pagos.dto.PagoRequestDTO;
 import cl.pagoflex.pagos.dto.PagoResponseDTO;
 import cl.pagoflex.pagos.exception.PagoDuplicadoException;
 import cl.pagoflex.pagos.exception.PagoNotFoundException;
 import cl.pagoflex.pagos.exception.PagoOperacionException;
+import cl.pagoflex.pagos.exception.CompromisoActualizacionException;
 import cl.pagoflex.pagos.model.EstadoPago;
 import cl.pagoflex.pagos.model.MetodoPago;
 import cl.pagoflex.pagos.model.Pago;
@@ -31,16 +35,23 @@ class PagoServiceTest {
 
     @Mock
     private PagoRepository repository;
+    @Mock
+    private CompromisoClient compromisoClient;
+    @Mock
+    private UsuarioClient usuarioClient;
+    @Mock
+    private EmpresaClient empresaClient;
 
     private PagoServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new PagoServiceImpl(repository);
+        service = new PagoServiceImpl(repository, compromisoClient, usuarioClient, empresaClient);
     }
 
     @Test
     void registraPagoPendienteConReferenciaUnica() {
+        prepararReferenciasValidas();
         when(repository.existsByCompromisoIdAndEstado(100L, EstadoPago.EXITOSO)).thenReturn(false);
         when(repository.existsByReferenciaTransaccion(any())).thenReturn(false);
         when(repository.save(any(Pago.class))).thenAnswer(invocation -> {
@@ -63,6 +74,7 @@ class PagoServiceTest {
 
         assertThatThrownBy(() -> service.registrar(request()))
                 .isInstanceOf(PagoDuplicadoException.class);
+        verify(compromisoClient, never()).buscarPorId(100L);
         verify(repository, never()).save(any(Pago.class));
     }
 
@@ -101,8 +113,24 @@ class PagoServiceTest {
         when(repository.save(any(Pago.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         assertThat(service.marcarExitoso(1L).getEstado()).isEqualTo(EstadoPago.EXITOSO);
+        verify(compromisoClient).marcarPagado(100L);
         assertThat(service.rechazar(2L).getEstado()).isEqualTo(EstadoPago.RECHAZADO);
         assertThat(service.anular(3L).getEstado()).isEqualTo(EstadoPago.ANULADO);
+    }
+
+    @Test
+    void persistePagoExitosoSiFallaLaActualizacionRemotaDelCompromiso() {
+        Pago pendiente = pago(EstadoPago.PENDIENTE);
+        when(repository.findById(1L)).thenReturn(Optional.of(pendiente));
+        when(repository.save(any(Pago.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        org.mockito.Mockito.doThrow(new cl.pagoflex.pagos.exception.DependenciaNoDisponibleException(
+                "ms-compromisos", "sin respuesta")).when(compromisoClient).marcarPagado(100L);
+
+        assertThatThrownBy(() -> service.marcarExitoso(1L))
+                .isInstanceOf(CompromisoActualizacionException.class)
+                .hasMessageContaining("pago quedó registrado como EXITOSO");
+        assertThat(pendiente.getEstado()).isEqualTo(EstadoPago.EXITOSO);
+        verify(repository).save(pendiente);
     }
 
     @Test
@@ -149,6 +177,14 @@ class PagoServiceTest {
         request.setMetodoPago(MetodoPago.TRANSFERENCIA);
         request.setDescripcion("Pago de prueba");
         return request;
+    }
+
+    private void prepararReferenciasValidas() {
+        when(compromisoClient.buscarPorId(100L)).thenReturn(
+                new CompromisoClient.CompromisoExterno(100L, 10L, 20L,
+                        new BigDecimal("1250.00"), "PENDIENTE"));
+        when(usuarioClient.buscarPorId(10L)).thenReturn(new UsuarioClient.UsuarioExterno(10L, true));
+        when(empresaClient.buscarPorId(20L)).thenReturn(new EmpresaClient.EmpresaExterna(20L, true));
     }
 
     private Pago pago(EstadoPago estado) {

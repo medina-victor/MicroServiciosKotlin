@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -36,6 +37,7 @@ public class CompromisoController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'SERVICE') or (hasRole('CLIENTE') and #request.usuarioId.toString() == authentication.tokenAttributes['usuarioId'].toString()) or (hasRole('EMPRESA') and #request.empresaId.toString() == authentication.tokenAttributes['empresaId'].toString())")
     @Operation(summary = "Registrar compromiso")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Compromiso registrado"),
@@ -92,6 +94,7 @@ public class CompromisoController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SERVICE') or (hasRole('CLIENTE') and #request.usuarioId.toString() == authentication.tokenAttributes['usuarioId'].toString()) or (hasRole('EMPRESA') and #request.empresaId.toString() == authentication.tokenAttributes['empresaId'].toString())")
     @Operation(summary = "Actualizar compromiso")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Compromiso actualizado"),

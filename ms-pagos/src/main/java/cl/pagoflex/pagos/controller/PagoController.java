@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -35,6 +36,7 @@ public class PagoController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'SERVICE') or (hasRole('CLIENTE') and #request.usuarioId.toString() == authentication.tokenAttributes['usuarioId'].toString()) or (hasRole('EMPRESA') and #request.empresaId.toString() == authentication.tokenAttributes['empresaId'].toString())")
     @Operation(summary = "Registrar un pago simulado")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Pago registrado como PENDIENTE"),

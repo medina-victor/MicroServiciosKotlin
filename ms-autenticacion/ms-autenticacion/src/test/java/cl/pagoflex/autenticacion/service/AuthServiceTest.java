@@ -86,7 +86,7 @@ class AuthServiceTest {
         when(repository.findByCorreo(request.getCorreo())).thenReturn(Optional.of(credencial));
         when(usuarioCliente.obtenerPorId(1L))
                 .thenReturn(new UsuarioCliente.UsuarioExterno(1L, "cliente@pagoflex.cl", "CLIENTE", true));
-        when(jwtService.generarToken(1L, "cliente@pagoflex.cl", "CLIENTE")).thenReturn("jwt-prueba");
+        when(jwtService.generarToken(1L, "cliente@pagoflex.cl", "CLIENTE", null)).thenReturn("jwt-prueba");
         when(jwtService.getExpirationMs()).thenReturn(3600000L);
 
         var response = service.login(request);

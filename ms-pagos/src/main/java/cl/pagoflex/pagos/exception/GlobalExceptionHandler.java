@@ -26,6 +26,25 @@ public class GlobalExceptionHandler {
         return respuesta(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
 
+    @ExceptionHandler(DependenciaNoDisponibleException.class)
+    public ResponseEntity<ErrorResponse> dependenciaNoDisponible(
+            DependenciaNoDisponibleException ex, HttpServletRequest request) {
+        return respuesta(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(DependenciaRemotaException.class)
+    public ResponseEntity<ErrorResponse> dependenciaRemota(
+            DependenciaRemotaException ex, HttpServletRequest request) {
+        return respuesta(ex.getStatus(), ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(CompromisoActualizacionException.class)
+    public ResponseEntity<ErrorResponse> compromisoNoActualizado(
+            CompromisoActualizacionException ex, HttpServletRequest request) {
+        LOGGER.error("Pago exitoso requiere reconciliación con compromiso", ex);
+        return respuesta(HttpStatus.BAD_GATEWAY, ex.getMessage(), request);
+    }
+
     @ExceptionHandler({PagoDuplicadoException.class, PagoOperacionException.class, DataIntegrityViolationException.class})
     public ResponseEntity<ErrorResponse> conflicto(Exception ex, HttpServletRequest request) {
         String mensaje = ex instanceof DataIntegrityViolationException

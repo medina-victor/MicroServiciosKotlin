@@ -58,6 +58,11 @@ public class GlobalExceptionHandler {
         return respuesta(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request);
     }
 
+    @ExceptionHandler(RespuestaServicioUsuariosException.class)
+    public ResponseEntity<ErrorResponse> respuestaUsuarios(RespuestaServicioUsuariosException ex, HttpServletRequest request) {
+        return respuesta(ex.getStatus(), ex.getMessage(), request);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> validacion(MethodArgumentNotValidException ex, HttpServletRequest request) {
         String mensaje = ex.getBindingResult().getFieldErrors().stream()

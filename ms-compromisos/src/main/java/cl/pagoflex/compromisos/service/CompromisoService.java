@@ -1,5 +1,7 @@
 package cl.pagoflex.compromisos.service;
 
+import cl.pagoflex.compromisos.client.EmpresaClient;
+import cl.pagoflex.compromisos.client.UsuarioClient;
 import cl.pagoflex.compromisos.dto.CompromisoRequestDTO;
 import cl.pagoflex.compromisos.dto.CompromisoResponseDTO;
 import cl.pagoflex.compromisos.exception.RecursoDuplicadoException;
@@ -20,13 +22,26 @@ import java.util.List;
 public class CompromisoService {
 
     private final CompromisoRepository compromisoRepository;
+    private final UsuarioClient usuarioClient;
+    private final EmpresaClient empresaClient;
 
-    public CompromisoService(CompromisoRepository compromisoRepository) {
+    public CompromisoService(CompromisoRepository compromisoRepository,
+                             UsuarioClient usuarioClient, EmpresaClient empresaClient) {
         this.compromisoRepository = compromisoRepository;
+        this.usuarioClient = usuarioClient;
+        this.empresaClient = empresaClient;
     }
 
     public CompromisoResponseDTO registrar(CompromisoRequestDTO request) {
         validarRequest(request);
+        UsuarioClient.UsuarioExterno usuario = usuarioClient.buscarPorId(request.getUsuarioId());
+        if (!Boolean.TRUE.equals(usuario.activo())) {
+            throw new SolicitudInvalidaException("El usuario no está activo");
+        }
+        EmpresaClient.EmpresaExterna empresa = empresaClient.buscarPorId(request.getEmpresaId());
+        if (!Boolean.TRUE.equals(empresa.activo())) {
+            throw new SolicitudInvalidaException("La empresa no está activa");
+        }
         Compromiso compromiso = new Compromiso();
         aplicarDatos(compromiso, request);
         compromiso.setEstado(EstadoCompromiso.PENDIENTE);

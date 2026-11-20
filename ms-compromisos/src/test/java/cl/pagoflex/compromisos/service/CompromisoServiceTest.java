@@ -1,5 +1,7 @@
 package cl.pagoflex.compromisos.service;
 
+import cl.pagoflex.compromisos.client.EmpresaClient;
+import cl.pagoflex.compromisos.client.UsuarioClient;
 import cl.pagoflex.compromisos.dto.CompromisoRequestDTO;
 import cl.pagoflex.compromisos.dto.CompromisoResponseDTO;
 import cl.pagoflex.compromisos.exception.RecursoNoEncontradoException;
@@ -30,12 +32,16 @@ class CompromisoServiceTest {
 
     @Mock
     private CompromisoRepository repository;
+    @Mock
+    private UsuarioClient usuarioClient;
+    @Mock
+    private EmpresaClient empresaClient;
 
     private CompromisoService service;
 
     @BeforeEach
     void setUp() {
-        service = new CompromisoService(repository);
+        service = new CompromisoService(repository, usuarioClient, empresaClient);
     }
 
     @Test
@@ -43,12 +49,23 @@ class CompromisoServiceTest {
         CompromisoRequestDTO request = request();
         Compromiso guardado = from(request);
         guardado.setId(1L);
+        when(usuarioClient.buscarPorId(10L)).thenReturn(new UsuarioClient.UsuarioExterno(10L, true));
+        when(empresaClient.buscarPorId(20L)).thenReturn(new EmpresaClient.EmpresaExterna(20L, true));
         when(repository.save(any(Compromiso.class))).thenReturn(guardado);
 
         CompromisoResponseDTO response = service.registrar(request);
 
         assertThat(response.getEstado()).isEqualTo(EstadoCompromiso.PENDIENTE);
         verify(repository).save(any(Compromiso.class));
+    }
+
+    @Test
+    void validaUsuarioActivoAntesDeGuardar() {
+        when(usuarioClient.buscarPorId(10L)).thenReturn(new UsuarioClient.UsuarioExterno(10L, false));
+        assertThatThrownBy(() -> service.registrar(request()))
+                .isInstanceOf(SolicitudInvalidaException.class)
+                .hasMessageContaining("usuario no está activo");
+        verify(repository, org.mockito.Mockito.never()).save(any(Compromiso.class));
     }
 
     @Test

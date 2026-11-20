@@ -1,10 +1,14 @@
 package cl.pagoflex.pagos.service;
 
+import cl.pagoflex.pagos.client.CompromisoClient;
+import cl.pagoflex.pagos.client.EmpresaClient;
+import cl.pagoflex.pagos.client.UsuarioClient;
 import cl.pagoflex.pagos.dto.PagoRequestDTO;
 import cl.pagoflex.pagos.dto.PagoResponseDTO;
 import cl.pagoflex.pagos.exception.PagoDuplicadoException;
 import cl.pagoflex.pagos.exception.PagoNotFoundException;
 import cl.pagoflex.pagos.exception.PagoOperacionException;
+import cl.pagoflex.pagos.exception.CompromisoActualizacionException;
 import cl.pagoflex.pagos.model.EstadoPago;
 import cl.pagoflex.pagos.model.Pago;
 import cl.pagoflex.pagos.repository.PagoRepository;
@@ -20,9 +24,16 @@ import java.util.UUID;
 public class PagoServiceImpl implements PagoService {
 
     private final PagoRepository pagoRepository;
+    private final CompromisoClient compromisoClient;
+    private final UsuarioClient usuarioClient;
+    private final EmpresaClient empresaClient;
 
-    public PagoServiceImpl(PagoRepository pagoRepository) {
+    public PagoServiceImpl(PagoRepository pagoRepository, CompromisoClient compromisoClient,
+                           UsuarioClient usuarioClient, EmpresaClient empresaClient) {
         this.pagoRepository = pagoRepository;
+        this.compromisoClient = compromisoClient;
+        this.usuarioClient = usuarioClient;
+        this.empresaClient = empresaClient;
     }
 
     @Override
@@ -30,7 +41,27 @@ public class PagoServiceImpl implements PagoService {
         if (pagoRepository.existsByCompromisoIdAndEstado(request.getCompromisoId(), EstadoPago.EXITOSO)) {
             throw new PagoDuplicadoException("El compromiso ya tiene un pago EXITOSO");
         }
-
+        CompromisoClient.CompromisoExterno compromiso = compromisoClient.buscarPorId(request.getCompromisoId());
+        if (!request.getUsuarioId().equals(compromiso.usuarioId())) {
+            throw new PagoOperacionException("El usuario del pago no corresponde al compromiso");
+        }
+        if (!request.getEmpresaId().equals(compromiso.empresaId())) {
+            throw new PagoOperacionException("La empresa del pago no corresponde al compromiso");
+        }
+        if (compromiso.monto() == null || request.getMonto().compareTo(compromiso.monto()) != 0) {
+            throw new PagoOperacionException("El monto del pago debe coincidir con el monto del compromiso");
+        }
+        if (!"PENDIENTE".equals(compromiso.estado()) && !"VENCIDO".equals(compromiso.estado())) {
+            throw new PagoOperacionException("Solo se pueden registrar pagos para compromisos PENDIENTE o VENCIDO");
+        }
+        UsuarioClient.UsuarioExterno usuario = usuarioClient.buscarPorId(request.getUsuarioId());
+        if (!Boolean.TRUE.equals(usuario.activo())) {
+            throw new PagoOperacionException("El usuario no está activo");
+        }
+        EmpresaClient.EmpresaExterna empresa = empresaClient.buscarPorId(request.getEmpresaId());
+        if (!Boolean.TRUE.equals(empresa.activo())) {
+            throw new PagoOperacionException("La empresa no está activa");
+        }
         Pago pago = new Pago();
         pago.setCompromisoId(request.getCompromisoId());
         pago.setUsuarioId(request.getUsuarioId());
@@ -81,6 +112,7 @@ public class PagoServiceImpl implements PagoService {
     }
 
     @Override
+    @Transactional(noRollbackFor = CompromisoActualizacionException.class)
     public PagoResponseDTO marcarExitoso(Long id) {
         Pago pago = obtenerPago(id);
         if (pago.getEstado() != EstadoPago.PENDIENTE) {
@@ -90,7 +122,13 @@ public class PagoServiceImpl implements PagoService {
             throw new PagoDuplicadoException("El compromiso ya tiene un pago EXITOSO");
         }
         pago.setEstado(EstadoPago.EXITOSO);
-        return PagoResponseDTO.desde(pagoRepository.save(pago));
+        Pago pagoExitoso = pagoRepository.save(pago);
+        try {
+            compromisoClient.marcarPagado(pagoExitoso.getCompromisoId());
+        } catch (RuntimeException ex) {
+            throw new CompromisoActualizacionException(pagoExitoso.getCompromisoId(), ex);
+        }
+        return PagoResponseDTO.desde(pagoExitoso);
     }
 
     @Override

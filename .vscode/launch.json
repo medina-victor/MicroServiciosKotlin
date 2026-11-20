@@ -2,6 +2,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "EurekaServerApplication",
+            "request": "launch",
+            "mainClass": "cl.pagoflex.eureka.EurekaServerApplication",
+            "projectName": ""
+        },
+        {
+            "type": "java",
             "name": "Spring Boot-MsCompromisosApplication<ms-compromisos>",
             "request": "launch",
             "cwd": "${workspaceFolder}",
@@ -17,6 +24,16 @@
             "cwd": "${workspaceFolder}",
             "mainClass": "cl.pagoflex.pagos.MsPagosApplication",
             "projectName": "ms-pagos",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "type": "java",
+            "name": "Spring Boot-MsAutenticacionApplication<ms-autenticacion>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "cl.pagoflex.autenticacion.MsAutenticacionApplication",
+            "projectName": "ms-autenticacion",
             "args": "",
             "envFile": "${workspaceFolder}/.env"
         }
