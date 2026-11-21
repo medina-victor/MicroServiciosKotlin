@@ -6,6 +6,7 @@ import cl.pagoflex.soporte.exception.TicketNoEncontradoException;
 import cl.pagoflex.soporte.model.CategoriaSoporte;
 import cl.pagoflex.soporte.model.EstadoTicket;
 import cl.pagoflex.soporte.model.PrioridadTicket;
+import cl.pagoflex.soporte.security.AccesoPropietario;
 import cl.pagoflex.soporte.service.TicketSoporteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.util.List;
 
@@ -37,17 +40,21 @@ class TicketSoporteControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new TicketSoporteController(service)).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(new TicketSoporteController(service))
+                .defaultRequest(get("/").principal(new UsernamePasswordAuthenticationToken(
+                        "admin", null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN")))))
+                .setControllerAdvice(new cl.pagoflex.soporte.exception.GlobalExceptionHandler())
+                .build();
     }
 
     @Test
     void crearListarYBuscar() throws Exception {
         TicketSoporteResponseDTO dto = respuesta();
-        when(service.crear(any())).thenReturn(dto);
-        when(service.listarTodas()).thenReturn(List.of(dto));
-        when(service.buscarPorId(1L)).thenReturn(dto);
-        when(service.buscarPorUsuario(1L)).thenReturn(List.of(dto));
-        when(service.buscarPorEmpresa(2L)).thenReturn(List.of(dto));
+        when(service.crear(any(), any(AccesoPropietario.class))).thenReturn(dto);
+        when(service.listarTodas(any(AccesoPropietario.class))).thenReturn(List.of(dto));
+        when(service.buscarPorId(eq(1L), any(AccesoPropietario.class))).thenReturn(dto);
+        when(service.buscarPorUsuario(eq(1L), any(AccesoPropietario.class))).thenReturn(List.of(dto));
+        when(service.buscarPorEmpresa(eq(2L), any(AccesoPropietario.class))).thenReturn(List.of(dto));
 
         mockMvc.perform(post("/api/soporte").contentType(MediaType.APPLICATION_JSON).content(creacionJson()))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.estado").value("ABIERTO"));
@@ -75,9 +82,8 @@ class TicketSoporteControllerTest {
 
     @Test
     void devuelveError404Y400() throws Exception {
-        mockMvc = MockMvcBuilders.standaloneSetup(new TicketSoporteController(service))
-                .setControllerAdvice(new cl.pagoflex.soporte.exception.GlobalExceptionHandler()).build();
-        when(service.buscarPorId(99L)).thenThrow(new TicketNoEncontradoException(99L));
+        when(service.buscarPorId(eq(99L), any(AccesoPropietario.class)))
+                .thenThrow(new TicketNoEncontradoException(99L));
 
         mockMvc.perform(get("/api/soporte/99"))
                 .andExpect(status().isNotFound())

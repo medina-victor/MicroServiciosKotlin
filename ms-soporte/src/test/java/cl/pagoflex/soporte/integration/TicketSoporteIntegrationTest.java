@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "jwt.secret=test-only-secret-with-at-least-32-bytes",
-        "services.internal-token=test-internal-token",
+        "services.internal-token=PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF",
         "eureka.client.enabled=false",
         "spring.datasource.url=jdbc:h2:mem:soporte_integration;DB_CLOSE_DELAY=-1",
         "spring.datasource.driver-class-name=org.h2.Driver",
@@ -56,7 +56,7 @@ class TicketSoporteIntegrationTest {
                  "descripcion":"Realicé un pago pero aparece pendiente","categoria":"PAGOS","prioridad":"MEDIA"}
                 """;
         String response = mockMvc.perform(post("/api/soporte")
-                        .header("X-Internal-Token", "test-internal-token")
+                        .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF")
                         .contentType(MediaType.APPLICATION_JSON).content(json))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.estado").value("ABIERTO"))
@@ -65,17 +65,18 @@ class TicketSoporteIntegrationTest {
                 .getJsonParser().parseMap(response).get("id") instanceof Number number
                 ? number.longValue() : 0L;
 
-        mockMvc.perform(get("/api/soporte/" + id).header("X-Internal-Token", "test-internal-token"))
+        mockMvc.perform(get("/api/soporte/" + id)
+                        .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.descripcion").value("Realicé un pago pero aparece pendiente"));
         mockMvc.perform(patch("/api/soporte/" + id + "/responder")
-                        .header("X-Internal-Token", "test-internal-token")
+                        .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"respuesta\":\"Estamos revisando la información de tu pago\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estado").value("RESPONDIDO"));
         mockMvc.perform(patch("/api/soporte/" + id + "/cerrar")
-                        .header("X-Internal-Token", "test-internal-token"))
+                        .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estado").value("CERRADO"))
                 .andExpect(jsonPath("$.fechaCierre").exists());

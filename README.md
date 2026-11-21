@@ -1,6 +1,6 @@
 # PagoFlex - Arquitectura de microservicios
 
-PagoFlex separa la gestión de usuarios, empresas, compromisos, pagos, soporte y autenticación en servicios Spring Boot independientes. Cada servicio conserva su base de datos y expone contratos REST. Eureka Server brinda descubrimiento por nombre de aplicación; el API Gateway todavía está pendiente y no es necesario para ejecutar los servicios directamente.
+PagoFlex separa la gestión de usuarios, empresas, compromisos, pagos, soporte y autenticación en servicios Spring Boot independientes. Cada servicio conserva su base de datos y expone contratos REST. Eureka Server brinda descubrimiento por nombre de aplicación y el API Gateway centraliza el acceso HTTP externo.
 
 ## Servicios y puertos
 
@@ -28,11 +28,13 @@ Los seis microservicios se registran en `http://localhost:8761/eureka/` con nomb
 
 Las llamadas REST tienen timeout de conexión y respuesta configurables y los reintentos de LoadBalancer están deshabilitados. Los errores de dependencias no se convierten en éxito: una caída produce HTTP 503; un error 5xx remoto se comunica como 502; respuestas 400, 404 y 409 conservan su código.
 
-La escritura en servicios diferentes no forma una transacción distribuida. Si el pago queda `EXITOSO` y falla el cambio de estado del compromiso a `PAGADO`, la API devuelve un error indicando que el pago ya se guardó y requiere reconciliación. El estado del pago no se revierte automáticamente.
+La escritura en servicios diferentes no forma una transacción distribuida. Para confirmar un pago, `ms-pagos` solicita primero que `ms-compromisos` marque como pagado el compromiso y envía el ID estable del pago. El compromiso guarda ese ID y procesa la misma confirmación de forma idempotente. Solo después de recibir confirmación, `ms-pagos` cambia el pago de `PENDIENTE` a `EXITOSO`.
+
+Si la llamada remota falla o vence por timeout, `ms-pagos` conserva el pago como `PENDIENTE` y responde con error; no registra un éxito local incompleto. La operación se recupera reintentando `PATCH /api/pagos/{id}/exitoso` para el mismo pago. Si el primer intento alcanzó `ms-compromisos` pero se perdió la respuesta, el ID de pago permite devolver la confirmación previa sin cambiar el compromiso por segunda vez. No se crea otro pago ni se aplican cargos adicionales. La reconciliación es manual mediante ese reintento; no hay un proceso automático en segundo plano.
 
 ## JWT y autorización directa
 
-`ms-autenticacion` mantiene registro, login, BCrypt y JWT HS256. Los demás servicios validan los JWT directamente con la misma clave compartida, sin depender de un Gateway. El claim `rol` conserva `CLIENTE`, `EMPRESA` o `ADMIN`; para usuarios EMPRESA se incluye `empresaId` como claim adicional para validar operaciones sobre su empresa. Registro y login de autenticación siguen siendo públicos; operaciones administrativas están restringidas.
+`ms-autenticacion` mantiene registro, login, BCrypt y JWT HS256. Los demás servicios validan los JWT directamente con la misma clave compartida, sin depender de un Gateway. El claim `rol` conserva `CLIENTE`, `EMPRESA` o `ADMIN`; para usuarios EMPRESA se incluye `empresaId` como claim adicional. `ms-compromisos`, `ms-pagos` y `ms-soporte` comprueban en el propio servicio que las lecturas pertenecen al `usuarioId` o `empresaId` del token validado. Los IDs del cuerpo no autorizan la operación ni permiten cambiar el propietario de un compromiso. `ADMIN` y las llamadas internas autenticadas con `X-Internal-Token` tienen acceso privilegiado; los listados globales y las operaciones administrativas siguen restringidos.
 
 Las llamadas internas usan el encabezado `X-Internal-Token`, configurado por entorno y compartido entre los servicios. El token interno no sustituye al JWT de usuario y debe mantenerse secreto.
 
@@ -60,7 +62,7 @@ No se incluyen secretos ni credenciales reales. Configura las variables en el en
 | Variable | Uso |
 |---|---|
 | `JWT_SECRET` | Clave HS256 de al menos 32 bytes; mismo valor en autenticación y servicios que validan JWT |
-| `INTERNAL_SERVICE_TOKEN` | Secreto compartido para llamadas REST entre servicios |
+| `INTERNAL_SERVICE_TOKEN` | Secreto compartido de al menos 32 bytes para llamadas REST internas; debe coincidir entre consumidores y servicios receptores |
 | `DB_URL` | URL JDBC MySQL del servicio que se inicia; por defecto se aplica la base correspondiente y `localhost:3306` |
 | `DB_USERNAME`, `DB_PASSWORD` | Credenciales MySQL |
 | `EUREKA_DEFAULT_ZONE` | Por defecto `http://localhost:8761/eureka/` |
@@ -89,7 +91,9 @@ Inicia cada comando desde la carpeta indicada, en terminales separadas:
 7. `ms-autenticacion\ms-autenticacion`: `.\mvnw.cmd spring-boot:run`
 8. `api-gateway`: `.\mvnw.cmd spring-boot:run`
 
-Define `JWT_SECRET`, `INTERNAL_SERVICE_TOKEN` y variables MySQL antes de iniciar. El panel Eureka está en http://localhost:8761/; las instancias aparecen bajo **Instances currently registered with Eureka**. En local, consulta además `/eureka/apps` para ver el registro.
+Define `JWT_SECRET`, `INTERNAL_SERVICE_TOKEN` y variables MySQL antes de iniciar. `JWT_SECRET` debe tener al menos 32 bytes y el mismo valor en `ms-autenticacion`, los microservicios protegidos y el Gateway. No guardes los valores reales en el repositorio. El panel Eureka está en http://localhost:8761/; las instancias aparecen bajo **Instances currently registered with Eureka**. En local, consulta además `/eureka/apps` para ver el registro.
+
+Si `INTERNAL_SERVICE_TOKEN` está vacío, el proceso puede iniciarse para pruebas aisladas, pero las llamadas internas no obtienen el rol `SERVICE` y serán rechazadas. En ejecución integrada, configura un token aleatorio de al menos 32 bytes con el mismo valor en cada consumidor y receptor.
 
 Comprueba el Gateway en `http://localhost:8090/actuator/health`. Para ver rutas disponibles en Actuator se requiere un JWT con rol ADMIN en `/actuator/gateway/routes`.
 

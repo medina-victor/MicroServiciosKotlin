@@ -17,6 +17,10 @@ public class ServiceClientConfig {
             @Value("${services.internal-token:}") String internalToken,
             @Value("${services.connect-timeout-ms:2000}") long connectTimeout,
             @Value("${services.read-timeout-ms:3000}") long readTimeout) {
+        if (internalToken != null && !internalToken.isBlank()
+                && internalToken.getBytes(java.nio.charset.StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("INTERNAL_SERVICE_TOKEN debe contener al menos 32 bytes");
+        }
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofMillis(connectTimeout));
         requestFactory.setReadTimeout(Duration.ofMillis(readTimeout));

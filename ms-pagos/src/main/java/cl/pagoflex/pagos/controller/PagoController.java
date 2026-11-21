@@ -3,6 +3,7 @@ package cl.pagoflex.pagos.controller;
 import cl.pagoflex.pagos.dto.PagoRequestDTO;
 import cl.pagoflex.pagos.dto.PagoResponseDTO;
 import cl.pagoflex.pagos.model.EstadoPago;
+import cl.pagoflex.pagos.security.AccesoPropietario;
 import cl.pagoflex.pagos.service.PagoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
 
@@ -43,15 +45,18 @@ public class PagoController {
             @ApiResponse(responseCode = "400", description = "Datos inválidos"),
             @ApiResponse(responseCode = "409", description = "El compromiso ya tiene un pago EXITOSO")
     })
-    public ResponseEntity<PagoResponseDTO> registrar(@Valid @RequestBody PagoRequestDTO request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(pagoService.registrar(request));
+    public ResponseEntity<PagoResponseDTO> registrar(
+            @Valid @RequestBody PagoRequestDTO request, Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(pagoService.registrar(request, AccesoPropietario.desde(authentication)));
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'SERVICE')")
     @Operation(summary = "Listar todos los pagos")
     @ApiResponse(responseCode = "200", description = "Listado obtenido")
-    public ResponseEntity<List<PagoResponseDTO>> listarTodos() {
-        return ResponseEntity.ok(pagoService.listarTodos());
+    public ResponseEntity<List<PagoResponseDTO>> listarTodos(Authentication authentication) {
+        return ResponseEntity.ok(pagoService.listarTodos(AccesoPropietario.desde(authentication)));
     }
 
     @GetMapping("/{id}")
@@ -61,29 +66,33 @@ public class PagoController {
             @ApiResponse(responseCode = "404", description = "Pago no encontrado")
     })
     public ResponseEntity<PagoResponseDTO> buscarPorId(
-            @Parameter(description = "Identificador del pago", example = "1") @PathVariable Long id) {
-        return ResponseEntity.ok(pagoService.buscarPorId(id));
+            @Parameter(description = "Identificador del pago", example = "1") @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(pagoService.buscarPorId(id, AccesoPropietario.desde(authentication)));
     }
 
     @GetMapping("/usuario/{usuarioId}")
     @Operation(summary = "Buscar pagos por usuario")
     @ApiResponse(responseCode = "200", description = "Listado obtenido")
-    public ResponseEntity<List<PagoResponseDTO>> buscarPorUsuario(@PathVariable Long usuarioId) {
-        return ResponseEntity.ok(pagoService.buscarPorUsuario(usuarioId));
+    public ResponseEntity<List<PagoResponseDTO>> buscarPorUsuario(
+            @PathVariable Long usuarioId, Authentication authentication) {
+        return ResponseEntity.ok(pagoService.buscarPorUsuario(usuarioId, AccesoPropietario.desde(authentication)));
     }
 
     @GetMapping("/empresa/{empresaId}")
     @Operation(summary = "Buscar pagos por empresa")
     @ApiResponse(responseCode = "200", description = "Listado obtenido")
-    public ResponseEntity<List<PagoResponseDTO>> buscarPorEmpresa(@PathVariable Long empresaId) {
-        return ResponseEntity.ok(pagoService.buscarPorEmpresa(empresaId));
+    public ResponseEntity<List<PagoResponseDTO>> buscarPorEmpresa(
+            @PathVariable Long empresaId, Authentication authentication) {
+        return ResponseEntity.ok(pagoService.buscarPorEmpresa(empresaId, AccesoPropietario.desde(authentication)));
     }
 
     @GetMapping("/compromiso/{compromisoId}")
     @Operation(summary = "Buscar pagos por compromiso")
     @ApiResponse(responseCode = "200", description = "Listado obtenido")
-    public ResponseEntity<List<PagoResponseDTO>> buscarPorCompromiso(@PathVariable Long compromisoId) {
-        return ResponseEntity.ok(pagoService.buscarPorCompromiso(compromisoId));
+    public ResponseEntity<List<PagoResponseDTO>> buscarPorCompromiso(
+            @PathVariable Long compromisoId, Authentication authentication) {
+        return ResponseEntity.ok(pagoService.buscarPorCompromiso(compromisoId, AccesoPropietario.desde(authentication)));
     }
 
     @GetMapping("/estado/{estado}")
@@ -92,11 +101,13 @@ public class PagoController {
             @ApiResponse(responseCode = "200", description = "Listado obtenido"),
             @ApiResponse(responseCode = "400", description = "Estado inválido")
     })
-    public ResponseEntity<List<PagoResponseDTO>> buscarPorEstado(@PathVariable EstadoPago estado) {
-        return ResponseEntity.ok(pagoService.buscarPorEstado(estado));
+    public ResponseEntity<List<PagoResponseDTO>> buscarPorEstado(
+            @PathVariable EstadoPago estado, Authentication authentication) {
+        return ResponseEntity.ok(pagoService.buscarPorEstado(estado, AccesoPropietario.desde(authentication)));
     }
 
     @PatchMapping("/{id}/exitoso")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SERVICE')")
     @Operation(summary = "Marcar un pago PENDIENTE como EXITOSO")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Pago actualizado"),
@@ -108,6 +119,7 @@ public class PagoController {
     }
 
     @PatchMapping("/{id}/rechazar")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Rechazar un pago PENDIENTE")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Pago rechazado"),
@@ -119,6 +131,7 @@ public class PagoController {
     }
 
     @PatchMapping("/{id}/anular")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Anular un pago PENDIENTE")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Pago anulado"),
@@ -130,6 +143,7 @@ public class PagoController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Eliminar un pago que no esté EXITOSO")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Pago eliminado"),

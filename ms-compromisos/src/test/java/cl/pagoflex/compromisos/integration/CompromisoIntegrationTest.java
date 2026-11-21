@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "jwt.secret=test-only-secret-with-at-least-32-bytes",
-        "services.internal-token=test-internal-token",
+        "services.internal-token=PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF",
         "eureka.client.enabled=false",
         "spring.datasource.url=jdbc:h2:mem:compromisos_integration;DB_CLOSE_DELAY=-1",
         "spring.datasource.driver-class-name=org.h2.Driver",
@@ -59,7 +59,7 @@ class CompromisoIntegrationTest {
                 """;
 
         String response = mockMvc.perform(post("/api/compromisos")
-                        .header("X-Internal-Token", "test-internal-token")
+                        .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF")
                         .contentType(MediaType.APPLICATION_JSON).content(json))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.estado").value("PENDIENTE"))
@@ -68,25 +68,50 @@ class CompromisoIntegrationTest {
                 .getJsonParser().parseMap(response).get("id") instanceof Number number
                 ? number.longValue() : 0L;
 
-        mockMvc.perform(get("/api/compromisos/" + id).header("X-Internal-Token", "test-internal-token"))
+        mockMvc.perform(get("/api/compromisos/" + id)
+                        .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.descripcion").value("Cuota"));
 
         mockMvc.perform(put("/api/compromisos/" + id)
-                        .header("X-Internal-Token", "test-internal-token")
+                        .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.replace("Cuota", "Cuota actualizada")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.descripcion").value("Cuota actualizada"));
 
         mockMvc.perform(patch("/api/compromisos/" + id + "/pagar")
-                        .header("X-Internal-Token", "test-internal-token"))
+                        .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estado").value("PAGADO"));
 
         mockMvc.perform(delete("/api/compromisos/" + id)
-                        .header("X-Internal-Token", "test-internal-token"))
+                        .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void confirmaElMismoPagoDeFormaIdempotente() throws Exception {
+        String json = """
+                {"usuarioId":1,"empresaId":2,"descripcion":"Cuota","monto":1000,
+                 "fechaVencimiento":"2099-12-31"}
+                """;
+        String response = mockMvc.perform(post("/api/compromisos")
+                        .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF")
+                        .contentType(MediaType.APPLICATION_JSON).content(json))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long id = org.springframework.boot.json.JsonParserFactory
+                .getJsonParser().parseMap(response).get("id") instanceof Number number
+                ? number.longValue() : 0L;
+
+        for (int intento = 0; intento < 2; intento++) {
+            mockMvc.perform(patch("/api/compromisos/" + id + "/pagar")
+                            .queryParam("pagoId", "77")
+                            .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.estado").value("PAGADO"));
+        }
     }
 
     @Test

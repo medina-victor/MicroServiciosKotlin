@@ -137,7 +137,8 @@ class GatewaySecurityIntegrationTest {
         assertThat(corsConfiguration.checkHeaders(java.util.List.of("authorization", "content-type"))).isNotNull();
 
         webTestClient.options()
-                .uri("/api/pagos")
+                .uri("http://localhost:8090/api/pagos")
+                .header(HttpHeaders.HOST, "localhost:8090")
                 .header(HttpHeaders.ORIGIN, allowedOrigin)
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "Authorization,Content-Type")
@@ -146,7 +147,8 @@ class GatewaySecurityIntegrationTest {
                 .expectHeader().valueEquals(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, allowedOrigin);
 
         webTestClient.options()
-                .uri("/api/pagos")
+                .uri("http://localhost:8090/api/pagos")
+                .header(HttpHeaders.HOST, "localhost:8090")
                 .header(HttpHeaders.ORIGIN, "https://not-allowed.example")
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
                 .exchange()

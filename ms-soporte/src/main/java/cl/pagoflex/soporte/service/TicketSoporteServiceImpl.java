@@ -13,6 +13,8 @@ import cl.pagoflex.soporte.model.EstadoTicket;
 import cl.pagoflex.soporte.model.PrioridadTicket;
 import cl.pagoflex.soporte.model.TicketSoporte;
 import cl.pagoflex.soporte.repository.TicketSoporteRepository;
+import cl.pagoflex.soporte.security.AccesoNoAutorizadoException;
+import cl.pagoflex.soporte.security.AccesoPropietario;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,8 +37,12 @@ public class TicketSoporteServiceImpl implements TicketSoporteService {
     }
 
     @Override
-    public TicketSoporteResponseDTO crear(TicketSoporteRequestDTO request) {
+    public TicketSoporteResponseDTO crear(TicketSoporteRequestDTO request, AccesoPropietario acceso) {
         validarCreacion(request);
+        if ((acceso.esCliente() && !acceso.usuarioId().equals(request.getUsuarioId()))
+                || (acceso.esEmpresa() && !acceso.empresaId().equals(request.getEmpresaId()))) {
+            throw new AccesoNoAutorizadoException();
+        }
         UsuarioClient.UsuarioExterno usuario = usuarioClient.buscarPorId(request.getUsuarioId());
         if (!Boolean.TRUE.equals(usuario.activo())) {
             throw new TicketOperacionException("El usuario no está activo");
@@ -60,58 +66,97 @@ public class TicketSoporteServiceImpl implements TicketSoporteService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<TicketSoporteResponseDTO> listarTodas() {
+    public List<TicketSoporteResponseDTO> listarTodas(AccesoPropietario acceso) {
+        exigirPrivilegiado(acceso);
         return repository.findAll().stream().map(TicketSoporteResponseDTO::desde).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public TicketSoporteResponseDTO buscarPorId(Long id) {
-        return TicketSoporteResponseDTO.desde(buscarEntidad(id));
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TicketSoporteResponseDTO> buscarPorUsuario(Long usuarioId) {
-        validarReferencia(usuarioId, "usuario");
-        return repository.findByUsuarioId(usuarioId).stream().map(TicketSoporteResponseDTO::desde).toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TicketSoporteResponseDTO> buscarPorEmpresa(Long empresaId) {
-        validarReferencia(empresaId, "empresa");
-        return repository.findByEmpresaId(empresaId).stream().map(TicketSoporteResponseDTO::desde).toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TicketSoporteResponseDTO> buscarPorEstado(EstadoTicket estado) {
-        if (estado == null) throw new TicketOperacionException("El estado es obligatorio");
-        return repository.findByEstado(estado).stream().map(TicketSoporteResponseDTO::desde).toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TicketSoporteResponseDTO> buscarPorCategoria(CategoriaSoporte categoria) {
-        if (categoria == null) throw new TicketOperacionException("La categoría es obligatoria");
-        return repository.findByCategoria(categoria).stream().map(TicketSoporteResponseDTO::desde).toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TicketSoporteResponseDTO> buscarPorPrioridad(PrioridadTicket prioridad) {
-        if (prioridad == null) throw new TicketOperacionException("La prioridad es obligatoria");
-        return repository.findByPrioridad(prioridad).stream().map(TicketSoporteResponseDTO::desde).toList();
-    }
-
-    @Override
-    public TicketSoporteResponseDTO actualizar(Long id, TicketSoporteRequestDTO request) {
+    public TicketSoporteResponseDTO buscarPorId(Long id, AccesoPropietario acceso) {
         TicketSoporte ticket = buscarEntidad(id);
+        acceso.exigirPropietario(ticket.getUsuarioId(), ticket.getEmpresaId());
+        return TicketSoporteResponseDTO.desde(ticket);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TicketSoporteResponseDTO> buscarPorUsuario(Long usuarioId, AccesoPropietario acceso) {
+        if (acceso.esCliente() && !acceso.usuarioId().equals(usuarioId)) {
+            throw new AccesoNoAutorizadoException();
+        }
+        validarReferencia(usuarioId, "usuario");
+        List<TicketSoporte> tickets = acceso.esEmpresa()
+                ? repository.findByUsuarioIdAndEmpresaId(usuarioId, acceso.empresaId())
+                : repository.findByUsuarioId(usuarioId);
+        return tickets.stream().map(TicketSoporteResponseDTO::desde).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TicketSoporteResponseDTO> buscarPorEmpresa(Long empresaId, AccesoPropietario acceso) {
+        if (acceso.esEmpresa() && !acceso.empresaId().equals(empresaId)) {
+            throw new AccesoNoAutorizadoException();
+        }
+        validarReferencia(empresaId, "empresa");
+        List<TicketSoporte> tickets = acceso.esCliente()
+                ? repository.findByUsuarioIdAndEmpresaId(acceso.usuarioId(), empresaId)
+                : repository.findByEmpresaId(empresaId);
+        return tickets.stream().map(TicketSoporteResponseDTO::desde).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TicketSoporteResponseDTO> buscarPorEstado(EstadoTicket estado, AccesoPropietario acceso) {
+        if (estado == null) throw new TicketOperacionException("El estado es obligatorio");
+        List<TicketSoporte> tickets = acceso.esCliente()
+                ? repository.findByUsuarioIdAndEstado(acceso.usuarioId(), estado)
+                : acceso.esEmpresa()
+                    ? repository.findByEmpresaIdAndEstado(acceso.empresaId(), estado)
+                    : repository.findByEstado(estado);
+        return tickets.stream().map(TicketSoporteResponseDTO::desde).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TicketSoporteResponseDTO> buscarPorCategoria(CategoriaSoporte categoria, AccesoPropietario acceso) {
+        if (categoria == null) throw new TicketOperacionException("La categoría es obligatoria");
+        List<TicketSoporte> tickets = acceso.esCliente()
+                ? repository.findByUsuarioIdAndCategoria(acceso.usuarioId(), categoria)
+                : acceso.esEmpresa()
+                    ? repository.findByEmpresaIdAndCategoria(acceso.empresaId(), categoria)
+                    : repository.findByCategoria(categoria);
+        return tickets.stream().map(TicketSoporteResponseDTO::desde).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TicketSoporteResponseDTO> buscarPorPrioridad(PrioridadTicket prioridad, AccesoPropietario acceso) {
+        if (prioridad == null) throw new TicketOperacionException("La prioridad es obligatoria");
+        List<TicketSoporte> tickets = acceso.esCliente()
+                ? repository.findByUsuarioIdAndPrioridad(acceso.usuarioId(), prioridad)
+                : acceso.esEmpresa()
+                    ? repository.findByEmpresaIdAndPrioridad(acceso.empresaId(), prioridad)
+                    : repository.findByPrioridad(prioridad);
+        return tickets.stream().map(TicketSoporteResponseDTO::desde).toList();
+    }
+
+    @Override
+    public TicketSoporteResponseDTO actualizar(
+            Long id, TicketSoporteRequestDTO request, AccesoPropietario acceso) {
+        TicketSoporte ticket = buscarEntidad(id);
+        acceso.exigirPropietario(ticket.getUsuarioId(), ticket.getEmpresaId());
         if (ticket.getEstado() == EstadoTicket.CERRADO) {
             throw new TicketOperacionException("No se puede actualizar un ticket cerrado");
         }
         validarCreacion(request);
+        if (!ticket.getUsuarioId().equals(request.getUsuarioId())) {
+            validarUsuarioActivo(request.getUsuarioId());
+        }
+        if (!java.util.Objects.equals(ticket.getEmpresaId(), request.getEmpresaId())
+                && request.getEmpresaId() != null) {
+            validarEmpresaActiva(request.getEmpresaId());
+        }
         ticket.setUsuarioId(request.getUsuarioId());
         ticket.setEmpresaId(request.getEmpresaId());
         ticket.setAsunto(request.getAsunto().trim());
@@ -194,5 +239,25 @@ public class TicketSoporteServiceImpl implements TicketSoporteService {
 
     private void validarReferencia(Long id, String nombre) {
         if (id == null || id <= 0) throw new TicketOperacionException("El identificador del " + nombre + " debe ser mayor que cero");
+    }
+
+    private void validarUsuarioActivo(Long usuarioId) {
+        UsuarioClient.UsuarioExterno usuario = usuarioClient.buscarPorId(usuarioId);
+        if (!Boolean.TRUE.equals(usuario.activo())) {
+            throw new TicketOperacionException("El usuario no está activo");
+        }
+    }
+
+    private void validarEmpresaActiva(Long empresaId) {
+        EmpresaClient.EmpresaExterna empresa = empresaClient.buscarPorId(empresaId);
+        if (!Boolean.TRUE.equals(empresa.activo())) {
+            throw new TicketOperacionException("La empresa no está activa");
+        }
+    }
+
+    private void exigirPrivilegiado(AccesoPropietario acceso) {
+        if (!acceso.privilegiado()) {
+            throw new AccesoNoAutorizadoException();
+        }
     }
 }

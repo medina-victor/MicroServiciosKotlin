@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "jwt.secret=test-only-secret-with-at-least-32-bytes",
-        "services.internal-token=test-internal-token",
+        "services.internal-token=PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF",
         "eureka.client.enabled=false",
         "spring.datasource.url=jdbc:h2:mem:pagos_integration;DB_CLOSE_DELAY=-1",
         "spring.datasource.driver-class-name=org.h2.Driver",
@@ -66,7 +66,7 @@ class PagoIntegrationTest {
                  "metodoPago":"TRANSFERENCIA","descripcion":"Cuota"}
                 """;
         String response = mockMvc.perform(post("/api/pagos")
-                        .header("X-Internal-Token", "test-internal-token")
+                        .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF")
                         .contentType(MediaType.APPLICATION_JSON).content(json))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.estado").value("PENDIENTE"))
@@ -75,20 +75,22 @@ class PagoIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         long id = ((Number) JsonParserFactory.getJsonParser().parseMap(response).get("id")).longValue();
 
-        mockMvc.perform(get("/api/pagos/" + id).header("X-Internal-Token", "test-internal-token"))
+        mockMvc.perform(get("/api/pagos/" + id)
+                        .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.compromisoId").value(100));
         mockMvc.perform(patch("/api/pagos/" + id + "/exitoso")
-                        .header("X-Internal-Token", "test-internal-token"))
+                        .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estado").value("EXITOSO"));
         mockMvc.perform(post("/api/pagos")
-                        .header("X-Internal-Token", "test-internal-token")
+                        .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409));
-        mockMvc.perform(delete("/api/pagos/" + id).header("X-Internal-Token", "test-internal-token"))
+        mockMvc.perform(delete("/api/pagos/" + id)
+                        .header("X-Internal-Token", "PAYOFLEX_TEST_INTERNAL_TOKEN_0123456789ABCDEF"))
                 .andExpect(status().isConflict());
     }
 
@@ -101,5 +103,12 @@ class PagoIntegrationTest {
         mockMvc.perform(get("/swagger-ui/index.html"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("text/html"));
+    }
+
+    @Test
+    @WithMockUser(roles = "CLIENTE")
+    void clienteNoPuedeEjecutarOperacionAdministrativa() throws Exception {
+        mockMvc.perform(patch("/api/pagos/1/exitoso"))
+                .andExpect(status().isForbidden());
     }
 }

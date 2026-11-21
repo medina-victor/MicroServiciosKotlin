@@ -12,6 +12,8 @@ import cl.pagoflex.pagos.exception.CompromisoActualizacionException;
 import cl.pagoflex.pagos.model.EstadoPago;
 import cl.pagoflex.pagos.model.Pago;
 import cl.pagoflex.pagos.repository.PagoRepository;
+import cl.pagoflex.pagos.security.AccesoNoAutorizadoException;
+import cl.pagoflex.pagos.security.AccesoPropietario;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,7 +39,11 @@ public class PagoServiceImpl implements PagoService {
     }
 
     @Override
-    public PagoResponseDTO registrar(PagoRequestDTO request) {
+    public PagoResponseDTO registrar(PagoRequestDTO request, AccesoPropietario acceso) {
+        if ((acceso.esCliente() && !acceso.usuarioId().equals(request.getUsuarioId()))
+                || (acceso.esEmpresa() && !acceso.empresaId().equals(request.getEmpresaId()))) {
+            throw new AccesoNoAutorizadoException();
+        }
         if (pagoRepository.existsByCompromisoIdAndEstado(request.getCompromisoId(), EstadoPago.EXITOSO)) {
             throw new PagoDuplicadoException("El compromiso ya tiene un pago EXITOSO");
         }
@@ -77,58 +83,84 @@ public class PagoServiceImpl implements PagoService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<PagoResponseDTO> listarTodos() {
+    public List<PagoResponseDTO> listarTodos(AccesoPropietario acceso) {
+        exigirPrivilegiado(acceso);
         return pagoRepository.findAll().stream().map(PagoResponseDTO::desde).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PagoResponseDTO buscarPorId(Long id) {
-        return PagoResponseDTO.desde(obtenerPago(id));
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<PagoResponseDTO> buscarPorUsuario(Long usuarioId) {
-        return pagoRepository.findByUsuarioId(usuarioId).stream().map(PagoResponseDTO::desde).toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<PagoResponseDTO> buscarPorEmpresa(Long empresaId) {
-        return pagoRepository.findByEmpresaId(empresaId).stream().map(PagoResponseDTO::desde).toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<PagoResponseDTO> buscarPorCompromiso(Long compromisoId) {
-        return pagoRepository.findByCompromisoId(compromisoId).stream().map(PagoResponseDTO::desde).toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<PagoResponseDTO> buscarPorEstado(EstadoPago estado) {
-        return pagoRepository.findByEstado(estado).stream().map(PagoResponseDTO::desde).toList();
-    }
-
-    @Override
-    @Transactional(noRollbackFor = CompromisoActualizacionException.class)
-    public PagoResponseDTO marcarExitoso(Long id) {
+    public PagoResponseDTO buscarPorId(Long id, AccesoPropietario acceso) {
         Pago pago = obtenerPago(id);
+        acceso.exigirPropietario(pago.getUsuarioId(), pago.getEmpresaId());
+        return PagoResponseDTO.desde(pago);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PagoResponseDTO> buscarPorUsuario(Long usuarioId, AccesoPropietario acceso) {
+        if (acceso.esCliente() && !acceso.usuarioId().equals(usuarioId)) {
+            throw new AccesoNoAutorizadoException();
+        }
+        List<Pago> pagos = acceso.esEmpresa()
+                ? pagoRepository.findByUsuarioIdAndEmpresaId(usuarioId, acceso.empresaId())
+                : pagoRepository.findByUsuarioId(usuarioId);
+        return pagos.stream().map(PagoResponseDTO::desde).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PagoResponseDTO> buscarPorEmpresa(Long empresaId, AccesoPropietario acceso) {
+        if (acceso.esEmpresa() && !acceso.empresaId().equals(empresaId)) {
+            throw new AccesoNoAutorizadoException();
+        }
+        List<Pago> pagos = acceso.esCliente()
+                ? pagoRepository.findByUsuarioIdAndEmpresaId(acceso.usuarioId(), empresaId)
+                : pagoRepository.findByEmpresaId(empresaId);
+        return pagos.stream().map(PagoResponseDTO::desde).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PagoResponseDTO> buscarPorCompromiso(Long compromisoId, AccesoPropietario acceso) {
+        List<Pago> pagos = acceso.esCliente()
+                ? pagoRepository.findByCompromisoIdAndUsuarioId(compromisoId, acceso.usuarioId())
+                : acceso.esEmpresa()
+                    ? pagoRepository.findByCompromisoIdAndEmpresaId(compromisoId, acceso.empresaId())
+                    : pagoRepository.findByCompromisoId(compromisoId);
+        return pagos.stream().map(PagoResponseDTO::desde).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PagoResponseDTO> buscarPorEstado(EstadoPago estado, AccesoPropietario acceso) {
+        List<Pago> pagos = acceso.esCliente()
+                ? pagoRepository.findByEstadoAndUsuarioId(estado, acceso.usuarioId())
+                : acceso.esEmpresa()
+                    ? pagoRepository.findByEstadoAndEmpresaId(estado, acceso.empresaId())
+                    : pagoRepository.findByEstado(estado);
+        return pagos.stream().map(PagoResponseDTO::desde).toList();
+    }
+
+    @Override
+    public PagoResponseDTO marcarExitoso(Long id) {
+        Pago pago = pagoRepository.findByIdForUpdate(id).orElseThrow(() -> new PagoNotFoundException(id));
+        if (pago.getEstado() == EstadoPago.EXITOSO) {
+            return PagoResponseDTO.desde(pago);
+        }
         if (pago.getEstado() != EstadoPago.PENDIENTE) {
             throw new PagoOperacionException("Solo se puede marcar como EXITOSO un pago PENDIENTE");
         }
         if (pagoRepository.existsByCompromisoIdAndEstado(pago.getCompromisoId(), EstadoPago.EXITOSO)) {
             throw new PagoDuplicadoException("El compromiso ya tiene un pago EXITOSO");
         }
-        pago.setEstado(EstadoPago.EXITOSO);
-        Pago pagoExitoso = pagoRepository.save(pago);
         try {
-            compromisoClient.marcarPagado(pagoExitoso.getCompromisoId());
+            compromisoClient.marcarPagado(pago.getCompromisoId(), pago.getId());
         } catch (RuntimeException ex) {
-            throw new CompromisoActualizacionException(pagoExitoso.getCompromisoId(), ex);
+            throw new CompromisoActualizacionException(pago.getCompromisoId(), ex);
         }
-        return PagoResponseDTO.desde(pagoExitoso);
+        pago.setEstado(EstadoPago.EXITOSO);
+        return PagoResponseDTO.desde(pagoRepository.save(pago));
     }
 
     @Override
@@ -170,5 +202,11 @@ public class PagoServiceImpl implements PagoService {
             referencia = "PAG-" + UUID.randomUUID();
         } while (pagoRepository.existsByReferenciaTransaccion(referencia));
         return referencia;
+    }
+
+    private void exigirPrivilegiado(AccesoPropietario acceso) {
+        if (!acceso.privilegiado()) {
+            throw new AccesoNoAutorizadoException();
+        }
     }
 }

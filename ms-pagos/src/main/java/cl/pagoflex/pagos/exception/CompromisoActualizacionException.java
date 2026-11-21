@@ -2,7 +2,7 @@ package cl.pagoflex.pagos.exception;
 
 public class CompromisoActualizacionException extends RuntimeException {
     public CompromisoActualizacionException(Long compromisoId, RuntimeException cause) {
-        super("El pago quedó registrado como EXITOSO, pero no se pudo actualizar el compromiso "
-                + compromisoId + ". Se requiere reconciliación.", cause);
+        super("No se pudo confirmar el compromiso " + compromisoId
+                + "; el pago permanece PENDIENTE y se puede reintentar con el mismo identificador.", cause);
     }
 }

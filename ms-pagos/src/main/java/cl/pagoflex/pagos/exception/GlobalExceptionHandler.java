@@ -1,5 +1,6 @@
 package cl.pagoflex.pagos.exception;
 
+import cl.pagoflex.pagos.security.AccesoNoAutorizadoException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -26,6 +27,12 @@ public class GlobalExceptionHandler {
         return respuesta(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
 
+    @ExceptionHandler(AccesoNoAutorizadoException.class)
+    public ResponseEntity<ErrorResponse> accesoDenegado(
+            AccesoNoAutorizadoException ex, HttpServletRequest request) {
+        return respuesta(HttpStatus.FORBIDDEN, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(DependenciaNoDisponibleException.class)
     public ResponseEntity<ErrorResponse> dependenciaNoDisponible(
             DependenciaNoDisponibleException ex, HttpServletRequest request) {
@@ -41,7 +48,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CompromisoActualizacionException.class)
     public ResponseEntity<ErrorResponse> compromisoNoActualizado(
             CompromisoActualizacionException ex, HttpServletRequest request) {
-        LOGGER.error("Pago exitoso requiere reconciliación con compromiso", ex);
+        LOGGER.error("Pago pendiente requiere confirmación del compromiso", ex);
         return respuesta(HttpStatus.BAD_GATEWAY, ex.getMessage(), request);
     }
 

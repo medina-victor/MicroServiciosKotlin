@@ -28,6 +28,9 @@ public class Compromiso {
     @Column(name = "empresa_id", nullable = false)
     private Long empresaId;
 
+    @Column(name = "pago_id", unique = true)
+    private Long pagoId;
+
     @Column(nullable = false, length = 500)
     private String descripcion;
 
@@ -66,6 +69,8 @@ public class Compromiso {
     public void setUsuarioId(Long usuarioId) { this.usuarioId = usuarioId; }
     public Long getEmpresaId() { return empresaId; }
     public void setEmpresaId(Long empresaId) { this.empresaId = empresaId; }
+    public Long getPagoId() { return pagoId; }
+    public void setPagoId(Long pagoId) { this.pagoId = pagoId; }
     public String getDescripcion() { return descripcion; }
     public void setDescripcion(String descripcion) { this.descripcion = descripcion; }
     public BigDecimal getMonto() { return monto; }

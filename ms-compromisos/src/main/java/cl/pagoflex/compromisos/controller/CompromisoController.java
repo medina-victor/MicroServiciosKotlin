@@ -3,6 +3,7 @@ package cl.pagoflex.compromisos.controller;
 import cl.pagoflex.compromisos.dto.CompromisoRequestDTO;
 import cl.pagoflex.compromisos.dto.CompromisoResponseDTO;
 import cl.pagoflex.compromisos.model.EstadoCompromiso;
+import cl.pagoflex.compromisos.security.AccesoPropietario;
 import cl.pagoflex.compromisos.service.CompromisoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -22,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
@@ -44,15 +47,18 @@ public class CompromisoController {
             @ApiResponse(responseCode = "400", description = "Datos inválidos"),
             @ApiResponse(responseCode = "500", description = "Error interno")
     })
-    public ResponseEntity<CompromisoResponseDTO> registrar(@Valid @RequestBody CompromisoRequestDTO request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(compromisoService.registrar(request));
+    public ResponseEntity<CompromisoResponseDTO> registrar(
+            @Valid @RequestBody CompromisoRequestDTO request, Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                compromisoService.registrar(request, AccesoPropietario.desde(authentication)));
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'SERVICE')")
     @Operation(summary = "Listar compromisos")
     @ApiResponse(responseCode = "200", description = "Listado obtenido")
-    public ResponseEntity<List<CompromisoResponseDTO>> listarTodas() {
-        return ResponseEntity.ok(compromisoService.listarTodas());
+    public ResponseEntity<List<CompromisoResponseDTO>> listarTodas(Authentication authentication) {
+        return ResponseEntity.ok(compromisoService.listarTodas(AccesoPropietario.desde(authentication)));
     }
 
     @GetMapping("/{id}")
@@ -62,24 +68,27 @@ public class CompromisoController {
             @ApiResponse(responseCode = "404", description = "Compromiso no encontrado")
     })
     public ResponseEntity<CompromisoResponseDTO> buscarPorId(
-            @Parameter(description = "Identificador del compromiso", example = "1") @PathVariable Long id) {
-        return ResponseEntity.ok(compromisoService.buscarPorId(id));
+            @Parameter(description = "Identificador del compromiso", example = "1") @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(compromisoService.buscarPorId(id, AccesoPropietario.desde(authentication)));
     }
 
     @GetMapping("/usuario/{usuarioId}")
     @Operation(summary = "Buscar compromisos por usuario")
     @ApiResponse(responseCode = "200", description = "Listado obtenido")
     public ResponseEntity<List<CompromisoResponseDTO>> buscarPorUsuario(
-            @Parameter(description = "Identificador del usuario", example = "10") @PathVariable Long usuarioId) {
-        return ResponseEntity.ok(compromisoService.buscarPorUsuario(usuarioId));
+            @Parameter(description = "Identificador del usuario", example = "10") @PathVariable Long usuarioId,
+            Authentication authentication) {
+        return ResponseEntity.ok(compromisoService.buscarPorUsuario(usuarioId, AccesoPropietario.desde(authentication)));
     }
 
     @GetMapping("/empresa/{empresaId}")
     @Operation(summary = "Buscar compromisos por empresa")
     @ApiResponse(responseCode = "200", description = "Listado obtenido")
     public ResponseEntity<List<CompromisoResponseDTO>> buscarPorEmpresa(
-            @Parameter(description = "Identificador de la empresa", example = "20") @PathVariable Long empresaId) {
-        return ResponseEntity.ok(compromisoService.buscarPorEmpresa(empresaId));
+            @Parameter(description = "Identificador de la empresa", example = "20") @PathVariable Long empresaId,
+            Authentication authentication) {
+        return ResponseEntity.ok(compromisoService.buscarPorEmpresa(empresaId, AccesoPropietario.desde(authentication)));
     }
 
     @GetMapping("/estado/{estado}")
@@ -89,8 +98,9 @@ public class CompromisoController {
             @ApiResponse(responseCode = "400", description = "Estado inválido")
     })
     public ResponseEntity<List<CompromisoResponseDTO>> buscarPorEstado(
-            @Parameter(description = "Estado", example = "PENDIENTE") @PathVariable EstadoCompromiso estado) {
-        return ResponseEntity.ok(compromisoService.buscarPorEstado(estado));
+            @Parameter(description = "Estado", example = "PENDIENTE") @PathVariable EstadoCompromiso estado,
+            Authentication authentication) {
+        return ResponseEntity.ok(compromisoService.buscarPorEstado(estado, AccesoPropietario.desde(authentication)));
     }
 
     @PutMapping("/{id}")
@@ -104,11 +114,12 @@ public class CompromisoController {
     })
     public ResponseEntity<CompromisoResponseDTO> actualizar(
             @Parameter(description = "Identificador del compromiso") @PathVariable Long id,
-            @Valid @RequestBody CompromisoRequestDTO request) {
-        return ResponseEntity.ok(compromisoService.actualizar(id, request));
+            @Valid @RequestBody CompromisoRequestDTO request, Authentication authentication) {
+        return ResponseEntity.ok(compromisoService.actualizar(id, request, AccesoPropietario.desde(authentication)));
     }
 
     @PatchMapping("/{id}/pagar")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SERVICE')")
     @Operation(summary = "Marcar compromiso como pagado")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Compromiso pagado"),
@@ -116,11 +127,13 @@ public class CompromisoController {
             @ApiResponse(responseCode = "409", description = "Transición de estado no permitida")
     })
     public ResponseEntity<CompromisoResponseDTO> pagar(
-            @Parameter(description = "Identificador del compromiso") @PathVariable Long id) {
-        return ResponseEntity.ok(compromisoService.pagar(id));
+            @Parameter(description = "Identificador del compromiso") @PathVariable Long id,
+            @RequestParam(required = false) Long pagoId) {
+        return ResponseEntity.ok(compromisoService.pagar(id, pagoId));
     }
 
     @PatchMapping("/{id}/cancelar")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Cancelar compromiso")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Compromiso cancelado"),
@@ -133,6 +146,7 @@ public class CompromisoController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Eliminar compromiso")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Compromiso eliminado"),

@@ -1,5 +1,6 @@
 package cl.pagoflex.soporte.exception;
 
+import cl.pagoflex.soporte.security.AccesoNoAutorizadoException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -20,6 +21,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TicketNoEncontradoException.class)
     public ResponseEntity<ErrorResponse> noEncontrado(TicketNoEncontradoException ex, HttpServletRequest request) {
         return respuesta(HttpStatus.NOT_FOUND, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(AccesoNoAutorizadoException.class)
+    public ResponseEntity<ErrorResponse> accesoDenegado(
+            AccesoNoAutorizadoException ex, HttpServletRequest request) {
+        return respuesta(HttpStatus.FORBIDDEN, ex.getMessage(), request);
     }
 
     @ExceptionHandler(DependenciaNoDisponibleException.class)

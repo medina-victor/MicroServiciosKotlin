@@ -20,8 +20,8 @@ public class CompromisoClient extends ServicioRestClient {
         return compromiso;
     }
 
-    public void marcarPagado(Long id) {
-        ejecutar(() -> restClient.patch().uri("/api/compromisos/{id}/pagar", id)
+    public void marcarPagado(Long id, Long pagoId) {
+        ejecutar(() -> restClient.patch().uri("/api/compromisos/{id}/pagar?pagoId={pagoId}", id, pagoId)
                 .retrieve().toBodilessEntity());
     }
 

@@ -21,6 +21,10 @@ public class ServiceTokenFilter extends OncePerRequestFilter {
     private final String expectedToken;
 
     public ServiceTokenFilter(@Value("${services.internal-token:}") String expectedToken) {
+        if (expectedToken != null && !expectedToken.isBlank()
+                && expectedToken.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("INTERNAL_SERVICE_TOKEN debe contener al menos 32 bytes");
+        }
         this.expectedToken = expectedToken;
     }
 
