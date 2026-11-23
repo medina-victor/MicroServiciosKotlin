@@ -16,7 +16,8 @@ public class JwtSecurityConfig {
     JwtDecoder jwtDecoder(@Value("${jwt.secret}") String secret) {
         if (secret == null || secret.isBlank()
                 || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
-            throw new IllegalStateException("JWT_SECRET debe contener al menos 32 bytes");
+            throw new IllegalStateException(
+                    "JWT_SECRET debe configurarse en el entorno con al menos 32 bytes y el mismo valor en todos los servicios");
         }
         return NimbusJwtDecoder.withSecretKey(
                 new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"))

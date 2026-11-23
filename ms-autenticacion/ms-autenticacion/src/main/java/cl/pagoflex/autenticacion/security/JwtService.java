@@ -6,7 +6,6 @@ import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -38,6 +37,7 @@ public class JwtService {
                       @Value("${jwt.expiration-ms:3600000}") long expirationMs) {
         this.secret = secret;
         this.expirationMs = expirationMs;
+        validarConfiguracion();
         this.jwtEncoder = parameters -> {
             try {
                 Map<String, Object> claims = parameters.getClaims().getClaims();
@@ -84,13 +84,14 @@ public class JwtService {
         this.jwtDecoder = NimbusJwtDecoder.withSecretKey(keySpec).macAlgorithm(MacAlgorithm.HS256).build();
     }
 
-    @PostConstruct
     void validarConfiguracion() {
         if (secret == null || secret.isBlank()) {
-            throw new IllegalStateException("JWT_SECRET es obligatorio");
+            throw new IllegalStateException(
+                    "JWT_SECRET es obligatorio; configúralo en el entorno con el mismo valor en todos los servicios");
         }
         if (secret.getBytes(StandardCharsets.UTF_8).length < 32) {
-            throw new IllegalStateException("JWT_SECRET debe tener al menos 32 bytes para HS256");
+            throw new IllegalStateException(
+                    "JWT_SECRET debe tener al menos 32 bytes para HS256 y el mismo valor en todos los servicios");
         }
         if (expirationMs <= 0) {
             throw new IllegalStateException("JWT_EXPIRATION_MS debe ser mayor que cero");

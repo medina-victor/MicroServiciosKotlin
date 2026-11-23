@@ -37,7 +37,9 @@ public class GatewaySecurityConfiguration {
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeExchange(authorize -> authorize
                         .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .pathMatchers(HttpMethod.POST, "/api/auth/registro", "/api/auth/login", "/api/usuarios")
+                        .pathMatchers(HttpMethod.POST, "/api/auth/registro", "/api/auth/login",
+                                "/api/auth/recuperacion/solicitar", "/api/auth/recuperacion/cambiar",
+                                "/api/usuarios")
                         .permitAll()
                         .pathMatchers("/actuator/health", "/actuator/health/**", "/actuator/info")
                         .permitAll()
@@ -74,7 +76,7 @@ public class GatewaySecurityConfiguration {
 
                         .pathMatchers(HttpMethod.PATCH, "/api/auth/desactivar/**").hasRole("ADMIN")
                         .pathMatchers("/api/auth/**").authenticated()
-                        .anyExchange().permitAll())
+                        .anyExchange().denyAll())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
                         jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
                 .build();

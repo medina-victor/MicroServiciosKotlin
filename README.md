@@ -14,12 +14,13 @@ PagoFlex separa la gestión de usuarios, empresas, compromisos, pagos, soporte y
 | `ms-soporte` | 8085 | `soporte_db` | Solicitudes de soporte |
 | `ms-autenticacion` | 8086 | `autenticacion_db` | Registro/login, BCrypt y emisión de JWT |
 | `api-gateway` | 8090 | Ninguna | Entrada HTTP, seguridad JWT y enrutamiento |
+| `ms-notificaciones` | 8089 | Ninguna | Envío interno de correos mediante Gmail SMTP |
 
-Todos los servicios usan Java 21 y Spring Boot 3.5.4. Eureka Server y los seis clientes usan Spring Cloud 2025.0.0.
+Todos los servicios usan Java 21 y Spring Boot 3.5.4. Eureka Server y sus ocho clientes (siete microservicios y el Gateway) usan Spring Cloud 2025.0.0.
 
 ## Descubrimiento y comunicación REST
 
-Los seis microservicios se registran en `http://localhost:8761/eureka/` con nombres de servicio únicos. Los consumidores usan esos nombres a través de Spring Cloud LoadBalancer, no direcciones de instancia fijas:
+Los siete microservicios y el API Gateway se registran en `http://localhost:8761/eureka/` con nombres de servicio únicos. Los consumidores usan esos nombres a través de Spring Cloud LoadBalancer, no direcciones de instancia fijas:
 
 - `ms-autenticacion` consulta usuarios en `ms-usuarios`.
 - `ms-compromisos` valida usuarios y empresas en `ms-usuarios` y `ms-empresas`.
@@ -75,8 +76,37 @@ No se incluyen secretos ni credenciales reales. Configura las variables en el en
 | `SERVICE_CONNECT_TIMEOUT_MS` | Timeout de conexión REST; por defecto 2000 ms |
 | `SERVICE_READ_TIMEOUT_MS` | Timeout de respuesta REST; por defecto 3000 ms |
 | `JWT_EXPIRATION_MS` | Duración de JWT; por defecto 3600000 ms |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | Configuración SMTP de Gmail para `ms-notificaciones` |
+| SMTP timeouts | Conexión 3000 ms, lectura/escritura 5000 ms en `ms-notificaciones` |
 
 En contenedores, configura Eureka con su DNS/nombre accesible desde la red de contenedores y usa ese valor en `EUREKA_DEFAULT_ZONE`. Los nombres de servicio usados por LoadBalancer deben coincidir con `spring.application.name`; las variables `*_SERVICE_URL` pueden apuntar al nombre DNS del servicio si la plataforma de contenedores no usa el registro Eureka.
+
+### Configuración local segura
+
+Los perfiles de VS Code cargan las variables desde `.env`. Copia `.env.example` a `.env` y completa los valores localmente; `.env` está excluido de Git. Genera una clave aleatoria de al menos 32 bytes para `JWT_SECRET` y otra clave aleatoria de al menos 32 bytes para `INTERNAL_SERVICE_TOKEN`. Usa una sola clave de cada tipo en todos los servicios correspondientes; no incluyas sus valores en el repositorio ni en logs.
+
+En PowerShell puedes generar cada valor sin instalar herramientas adicionales:
+
+```powershell
+$bytes = New-Object byte[] 48
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+[Convert]::ToBase64String($bytes)
+$rng.Dispose()
+```
+
+Ejecuta el bloque por separado para cada clave y copia el resultado directamente a tu `.env`. No configures `DB_URL` globalmente en ese archivo: los valores predeterminados conservan una base de datos distinta para cada microservicio. Completa `DB_USERNAME` y `DB_PASSWORD` según tu MySQL; SMTP solo se requiere para enviar correos de recuperación.
+
+Para iniciar desde una terminal PowerShell con Maven, carga `.env` en cada terminal antes de ejecutar el wrapper:
+
+```powershell
+Get-Content .env | Where-Object { $_ -match '^\s*[^#].*=' } | ForEach-Object {
+    $name, $value = $_ -split '=', 2
+    Set-Item "Env:$($name.Trim())" $value.Trim()
+}
+```
+
+El emulador Android puede usar `http://10.0.2.2:8090/` como base URL. Swagger está disponible en `/swagger-ui/index.html` en cada microservicio HTTP; Eureka y el Gateway no publican Swagger en esta configuración.
 
 ## Orden recomendado de inicio
 
@@ -88,12 +118,13 @@ Inicia cada comando desde la carpeta indicada, en terminales separadas:
 4. `ms-compromisos`: `.\mvnw.cmd spring-boot:run`
 5. `ms-pagos`: `.\mvnw.cmd spring-boot:run`
 6. `ms-soporte`: `.\mvnw.cmd spring-boot:run`
-7. `ms-autenticacion\ms-autenticacion`: `.\mvnw.cmd spring-boot:run`
-8. `api-gateway`: `.\mvnw.cmd spring-boot:run`
+7. `ms-notificaciones`: `.\mvnw.cmd spring-boot:run`
+8. `ms-autenticacion\ms-autenticacion`: `.\mvnw.cmd spring-boot:run`
+9. `api-gateway`: `.\mvnw.cmd spring-boot:run`
 
 Define `JWT_SECRET`, `INTERNAL_SERVICE_TOKEN` y variables MySQL antes de iniciar. `JWT_SECRET` debe tener al menos 32 bytes y el mismo valor en `ms-autenticacion`, los microservicios protegidos y el Gateway. No guardes los valores reales en el repositorio. El panel Eureka está en http://localhost:8761/; las instancias aparecen bajo **Instances currently registered with Eureka**. En local, consulta además `/eureka/apps` para ver el registro.
 
-Si `INTERNAL_SERVICE_TOKEN` está vacío, el proceso puede iniciarse para pruebas aisladas, pero las llamadas internas no obtienen el rol `SERVICE` y serán rechazadas. En ejecución integrada, configura un token aleatorio de al menos 32 bytes con el mismo valor en cada consumidor y receptor.
+`INTERNAL_SERVICE_TOKEN` es obligatorio y debe tener al menos 32 bytes. Si falta o no cumple la longitud mínima, los servicios que lo validan o realizan llamadas internas fallan al inicializar; configura el mismo valor en cada consumidor y receptor antes de iniciarlos.
 
 Comprueba el Gateway en `http://localhost:8090/actuator/health`. Para ver rutas disponibles en Actuator se requiere un JWT con rol ADMIN en `/actuator/gateway/routes`.
 
@@ -107,6 +138,7 @@ Los endpoints existentes se mantienen:
 - Pagos: `/api/pagos`, búsquedas por usuario/empresa/compromiso/estado y transiciones `/exitoso`, `/rechazar`, `/anular`.
 - Soporte: `/api/soporte` y filtros por ID, usuario, empresa, estado, categoría y prioridad; cambios con rutas `/estado`, `/responder` y `/cerrar`.
 - Autenticación: `POST /api/auth/registro`, `POST /api/auth/login`, `GET /api/auth/validar`, `GET /api/auth/me`, `PATCH /api/auth/desactivar/{usuarioId}`.
+- Recuperación pública: `POST /api/auth/recuperacion/solicitar`, `POST /api/auth/recuperacion/cambiar`.
 
 Cada API Springdoc conserva su documentación local en `/swagger-ui/index.html` y `/v3/api-docs`.
 

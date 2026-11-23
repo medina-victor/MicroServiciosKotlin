@@ -37,6 +37,24 @@ public class Credencial {
     @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDateTime fechaActualizacion;
 
+    @Column(name = "recovery_code_hash", length = 64)
+    private String recoveryCodeHash;
+
+    @Column(name = "recovery_code_expiration")
+    private LocalDateTime recoveryCodeExpiration;
+
+    @Column(name = "recovery_code_used", nullable = false)
+    private boolean recoveryCodeUsed = true;
+
+    @Column(name = "recovery_attempts", nullable = false)
+    private int recoveryAttempts = 0;
+
+    @Column(name = "recovery_locked_until")
+    private LocalDateTime recoveryLockedUntil;
+
+    @Column(name = "recovery_requested_at")
+    private LocalDateTime recoveryRequestedAt;
+
     public Credencial() {
     }
 
@@ -66,4 +84,16 @@ public class Credencial {
     public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
     public LocalDateTime getFechaActualizacion() { return fechaActualizacion; }
     public void setFechaActualizacion(LocalDateTime fechaActualizacion) { this.fechaActualizacion = fechaActualizacion; }
+    public String getRecoveryCodeHash() { return recoveryCodeHash; }
+    public void setRecoveryCodeHash(String recoveryCodeHash) { this.recoveryCodeHash = recoveryCodeHash; }
+    public LocalDateTime getRecoveryCodeExpiration() { return recoveryCodeExpiration; }
+    public void setRecoveryCodeExpiration(LocalDateTime recoveryCodeExpiration) { this.recoveryCodeExpiration = recoveryCodeExpiration; }
+    public boolean isRecoveryCodeUsed() { return recoveryCodeUsed; }
+    public void setRecoveryCodeUsed(boolean recoveryCodeUsed) { this.recoveryCodeUsed = recoveryCodeUsed; }
+    public int getRecoveryAttempts() { return recoveryAttempts; }
+    public void setRecoveryAttempts(int recoveryAttempts) { this.recoveryAttempts = recoveryAttempts; }
+    public LocalDateTime getRecoveryLockedUntil() { return recoveryLockedUntil; }
+    public void setRecoveryLockedUntil(LocalDateTime recoveryLockedUntil) { this.recoveryLockedUntil = recoveryLockedUntil; }
+    public LocalDateTime getRecoveryRequestedAt() { return recoveryRequestedAt; }
+    public void setRecoveryRequestedAt(LocalDateTime recoveryRequestedAt) { this.recoveryRequestedAt = recoveryRequestedAt; }
 }

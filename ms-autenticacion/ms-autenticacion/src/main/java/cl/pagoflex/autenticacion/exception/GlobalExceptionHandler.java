@@ -58,6 +58,18 @@ public class GlobalExceptionHandler {
         return respuesta(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request);
     }
 
+    @ExceptionHandler(NotificacionesNoDisponibleException.class)
+    public ResponseEntity<ErrorResponse> notificacionesNoDisponible(
+            NotificacionesNoDisponibleException ex, HttpServletRequest request) {
+        return respuesta(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(CodigoRecuperacionInvalidoException.class)
+    public ResponseEntity<ErrorResponse> codigoRecuperacionInvalido(
+            CodigoRecuperacionInvalidoException ex, HttpServletRequest request) {
+        return respuesta(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(RespuestaServicioUsuariosException.class)
     public ResponseEntity<ErrorResponse> respuestaUsuarios(RespuestaServicioUsuariosException ex, HttpServletRequest request) {
         return respuesta(ex.getStatus(), ex.getMessage(), request);

@@ -2,10 +2,44 @@
     "configurations": [
         {
             "type": "java",
+            "name": "UsuariosApplication",
+            "request": "launch",
+            "mainClass": "cl.pagoflex.usuarios.UsuariosApplication",
+            "projectName": ""
+        },
+        {
+            "type": "java",
+            "name": "MsEmpresasApplication",
+            "request": "launch",
+            "mainClass": "cl.pagoflex.empresas.MsEmpresasApplication",
+            "projectName": ""
+        },
+        {
+            "type": "java",
             "name": "EurekaServerApplication",
             "request": "launch",
             "mainClass": "cl.pagoflex.eureka.EurekaServerApplication",
             "projectName": ""
+        },
+        {
+            "type": "java",
+            "name": "Spring Boot-UsuariosApplication<ms-usuarios>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "cl.pagoflex.usuarios.UsuariosApplication",
+            "projectName": "ms-usuarios",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "type": "java",
+            "name": "Spring Boot-MsEmpresasApplication<ms-empresas>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "cl.pagoflex.empresas.MsEmpresasApplication",
+            "projectName": "ms-empresas",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
         },
         {
             "type": "java",
@@ -34,6 +68,46 @@
             "cwd": "${workspaceFolder}",
             "mainClass": "cl.pagoflex.autenticacion.MsAutenticacionApplication",
             "projectName": "ms-autenticacion",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "type": "java",
+            "name": "Spring Boot-ApiGatewayApplication<api-gateway>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "cl.pagoflex.gateway.ApiGatewayApplication",
+            "projectName": "api-gateway",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "type": "java",
+            "name": "Spring Boot-EurekaServerApplication<eureka-server>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "cl.pagoflex.eureka.EurekaServerApplication",
+            "projectName": "eureka-server",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "type": "java",
+            "name": "Spring Boot-MsNotificacionesApplication<ms-notificaciones>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "cl.pagoflex.notificaciones.MsNotificacionesApplication",
+            "projectName": "ms-notificaciones",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "type": "java",
+            "name": "Spring Boot-MsSoporteApplication<ms-soporte>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "cl.pagoflex.soporte.MsSoporteApplication",
+            "projectName": "ms-soporte",
             "args": "",
             "envFile": "${workspaceFolder}/.env"
         }

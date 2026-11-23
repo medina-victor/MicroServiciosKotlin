@@ -3,6 +3,7 @@ package cl.pagoflex.autenticacion.controller;
 import cl.pagoflex.autenticacion.dto.AuthResponseDTO;
 import cl.pagoflex.autenticacion.model.Credencial;
 import cl.pagoflex.autenticacion.service.AuthService;
+import cl.pagoflex.autenticacion.service.RecuperacionContrasenaService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -26,6 +27,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private RecuperacionContrasenaService recuperacionContrasenaService;
 
     @Test
     void registroValidaDatos() throws Exception {
@@ -67,6 +71,22 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("jwt"))
                 .andExpect(jsonPath("$.tokenType").value("Bearer"));
+    }
+
+    @Test
+    void recuperacionEsPublica() throws Exception {
+        mockMvc.perform(post("/api/auth/recuperacion/solicitar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correo\":\"cliente@pagoflex.cl\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void cambiarContrasenaValidaDatos() throws Exception {
+        mockMvc.perform(post("/api/auth/recuperacion/cambiar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correo\":\"cliente@pagoflex.cl\",\"codigo\":\"123456\",\"nuevaContrasena\":\"Nueva123\"}"))
+                .andExpect(status().isOk());
     }
 
     @Test

@@ -21,9 +21,13 @@ public class ServiceTokenFilter extends OncePerRequestFilter {
     private final String expectedToken;
 
     public ServiceTokenFilter(@Value("${services.internal-token:}") String expectedToken) {
-        if (expectedToken != null && !expectedToken.isBlank()
-                && expectedToken.getBytes(StandardCharsets.UTF_8).length < 32) {
-            throw new IllegalStateException("INTERNAL_SERVICE_TOKEN debe contener al menos 32 bytes");
+        if (expectedToken == null || expectedToken.isBlank()) {
+            throw new IllegalStateException(
+                    "INTERNAL_SERVICE_TOKEN es obligatorio; configúralo en el entorno con el mismo valor en todos los servicios");
+        }
+        if (expectedToken.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException(
+                    "INTERNAL_SERVICE_TOKEN debe tener al menos 32 bytes y el mismo valor en todos los servicios");
         }
         this.expectedToken = expectedToken;
     }

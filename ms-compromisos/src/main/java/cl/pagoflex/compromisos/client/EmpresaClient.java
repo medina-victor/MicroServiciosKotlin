@@ -1,3 +1,4 @@
+
 package cl.pagoflex.compromisos.client;
 
 import cl.pagoflex.compromisos.exception.DependenciaNoDisponibleException;
@@ -11,27 +12,53 @@ import org.springframework.web.client.RestClientException;
 
 @Component
 public class EmpresaClient {
-    private final RestClient restClient;
 
-    public EmpresaClient(RestClient.Builder builder, @Value("${services.empresas.url:http://ms-empresas}") String baseUrl) {
-        this.restClient = builder.clone().baseUrl(baseUrl).build();
+    private final RestClient restClient;
+    private final String internalToken;
+
+    public EmpresaClient(
+            RestClient.Builder builder,
+            @Value("${services.empresas.url:http://ms-empresas}") String baseUrl,
+            @Value("${services.internal-token}") String internalToken) {
+
+        this.restClient = builder.clone()
+                .baseUrl(baseUrl)
+                .build();
+
+        this.internalToken = internalToken;
     }
 
     public EmpresaExterna buscarPorId(Long id) {
         try {
-            EmpresaExterna empresa = restClient.get().uri("/api/empresas/{id}", id)
-                    .retrieve().body(EmpresaExterna.class);
-            if (empresa == null) throw new DependenciaNoDisponibleException("ms-empresas", "respuesta vacía");
-            if (!id.equals(empresa.id())) {
-                throw new DependenciaNoDisponibleException("ms-empresas", "respuesta con identificador inconsistente");
+            EmpresaExterna empresa = restClient.get()
+                    .uri("/api/empresas/{id}", id)
+                    .header("X-Internal-Token", internalToken)
+                    .retrieve()
+                    .body(EmpresaExterna.class);
+
+            if (empresa == null) {
+                throw new DependenciaNoDisponibleException(
+                        "ms-empresas", "respuesta vacía");
             }
+
+            if (!id.equals(empresa.id())) {
+                throw new DependenciaNoDisponibleException(
+                        "ms-empresas", "respuesta con identificador inconsistente");
+            }
+
             return empresa;
+
         } catch (HttpStatusCodeException ex) {
-            throw new DependenciaRemotaException("ms-empresas", ex.getStatusCode().value());
+            throw new DependenciaRemotaException(
+                    "ms-empresas", ex.getStatusCode().value());
+
         } catch (ResourceAccessException ex) {
-            throw new DependenciaNoDisponibleException("ms-empresas", "sin respuesta dentro del tiempo límite");
+            throw new DependenciaNoDisponibleException(
+                    "ms-empresas", "sin respuesta dentro del tiempo límite");
+
         } catch (RestClientException ex) {
-            throw new DependenciaNoDisponibleException("ms-empresas", "error de comunicación");
+            throw new DependenciaNoDisponibleException(
+                    "ms-empresas", "error de comunicación");
         }
     }
 

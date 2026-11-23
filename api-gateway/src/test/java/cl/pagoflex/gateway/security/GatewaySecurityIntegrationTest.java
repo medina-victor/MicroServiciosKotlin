@@ -54,6 +54,23 @@ class GatewaySecurityIntegrationTest {
     }
 
     @Test
+    void allowsPasswordRecoveryEndpointsWithoutJwt() {
+        webTestClient.post()
+                .uri("/api/auth/recuperacion/solicitar")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"correo\":\"usuario@example.com\"}")
+                .exchange()
+                .expectStatus().isEqualTo(502);
+
+        webTestClient.post()
+                .uri("/api/auth/recuperacion/cambiar")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"correo\":\"usuario@example.com\",\"codigo\":\"123456\",\"nuevaContrasena\":\"Nueva123\"}")
+                .exchange()
+                .expectStatus().isEqualTo(502);
+    }
+
+    @Test
     void rejectsProtectedRequestsWithoutJwt() {
         webTestClient.get()
                 .uri("/api/compromisos/1")
@@ -103,7 +120,7 @@ class GatewaySecurityIntegrationTest {
     }
 
     @Test
-    void normalizesUnavailableServicesAndUnknownRoutesAsJson() {
+    void normalizesUnavailableServicesAndRejectsUnknownRoutes() {
         webTestClient.get()
                 .uri("/api/auth/me")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUnchecked("CLIENTE", Instant.now().plusSeconds(300)))
@@ -116,10 +133,10 @@ class GatewaySecurityIntegrationTest {
         webTestClient.get()
                 .uri("/not-a-gateway-route")
                 .exchange()
-                .expectStatus().isNotFound()
+                .expectStatus().isUnauthorized()
                 .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
                 .expectBody()
-                .jsonPath("$.status").isEqualTo(404);
+                .jsonPath("$.status").isEqualTo(401);
     }
 
     @Test

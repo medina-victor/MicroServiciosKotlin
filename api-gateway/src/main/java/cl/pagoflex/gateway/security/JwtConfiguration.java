@@ -32,7 +32,8 @@ public class JwtConfiguration {
     ReactiveJwtDecoder reactiveJwtDecoder(@Value("${gateway.security.jwt-secret}") String secret) {
         if (secret == null || secret.isBlank()
                 || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
-            throw new IllegalStateException("JWT_SECRET debe contener al menos 32 bytes");
+            throw new IllegalStateException(
+                    "JWT_SECRET debe configurarse en el entorno con al menos 32 bytes y el mismo valor en todos los servicios");
         }
 
         NimbusReactiveJwtDecoder decoder = NimbusReactiveJwtDecoder

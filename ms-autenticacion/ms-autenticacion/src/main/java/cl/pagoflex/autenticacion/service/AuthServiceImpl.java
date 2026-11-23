@@ -8,6 +8,7 @@ import cl.pagoflex.autenticacion.dto.UsuarioAutenticadoDTO;
 import cl.pagoflex.autenticacion.exception.CredencialDuplicadaException;
 import cl.pagoflex.autenticacion.exception.CredencialNotFoundException;
 import cl.pagoflex.autenticacion.exception.CredencialesInvalidasException;
+import cl.pagoflex.autenticacion.exception.ServicioUsuariosNoDisponibleException;
 import cl.pagoflex.autenticacion.exception.UsuarioInactivoException;
 import cl.pagoflex.autenticacion.exception.UsuarioNoEncontradoException;
 import cl.pagoflex.autenticacion.model.Credencial;
@@ -85,10 +86,15 @@ public class AuthServiceImpl implements AuthService {
         if (usuario.rol() == null) {
             throw new UsuarioNoEncontradoException();
         }
+        if ("EMPRESA".equals(usuario.rol())
+                && (usuario.empresaId() == null || usuario.empresaId() <= 0)) {
+            throw new ServicioUsuariosNoDisponibleException(
+                    "ms-usuarios devolvió un empresaId inválido para un usuario EMPRESA");
+        }
 
         String token = jwtService.generarToken(usuario.id(), usuario.correo(), usuario.rol(), usuario.empresaId());
         return new AuthResponseDTO(token, "Bearer", jwtService.getExpirationMs(),
-                usuario.id(), usuario.correo(), usuario.rol());
+                usuario.id(), usuario.empresaId(), usuario.correo(), usuario.rol());
     }
 
     @Override
@@ -107,7 +113,10 @@ public class AuthServiceImpl implements AuthService {
             throw new cl.pagoflex.autenticacion.exception.TokenInvalidoException();
         }
         Long id = usuarioId instanceof Number number ? number.longValue() : Long.valueOf(usuarioId.toString());
-        return new UsuarioAutenticadoDTO(id, jwt.getSubject(), jwt.getClaimAsString("rol"));
+        Object empresaId = jwt.getClaim("empresaId");
+        Long idEmpresa = empresaId instanceof Number number ? number.longValue()
+                : empresaId == null ? null : Long.valueOf(empresaId.toString());
+        return new UsuarioAutenticadoDTO(id, idEmpresa, jwt.getSubject(), jwt.getClaimAsString("rol"));
     }
 
     @Override

@@ -34,9 +34,16 @@ class JwtServiceTest {
 
     @Test
     void rechazaConfiguracionInsegura() {
-        JwtService corto = new JwtService("corto", 3600000L);
-        assertThatThrownBy(corto::validarConfiguracion)
+        assertThatThrownBy(() -> new JwtService("corto", 3600000L))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("32 bytes");
+    }
+
+    @Test
+    void incluyeEmpresaEnLosClaimsCuandoCorresponde() {
+        String token = jwtService.generarToken(42L, "empresa@pagoflex.cl", "EMPRESA", 20L);
+        Jwt jwt = jwtService.decodificar(token);
+
+        assertThat(((Number) jwt.getClaim("empresaId")).longValue()).isEqualTo(20L);
     }
 }

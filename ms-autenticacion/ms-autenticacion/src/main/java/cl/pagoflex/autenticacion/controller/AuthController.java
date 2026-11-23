@@ -4,8 +4,12 @@ import cl.pagoflex.autenticacion.dto.AuthResponseDTO;
 import cl.pagoflex.autenticacion.dto.LoginRequestDTO;
 import cl.pagoflex.autenticacion.dto.RegistroRequestDTO;
 import cl.pagoflex.autenticacion.dto.UsuarioAutenticadoDTO;
+import cl.pagoflex.autenticacion.dto.SolicitudRecuperacionDTO;
+import cl.pagoflex.autenticacion.dto.CambioContrasenaRecuperacionDTO;
+import cl.pagoflex.autenticacion.dto.RespuestaRecuperacionDTO;
 import cl.pagoflex.autenticacion.model.Credencial;
 import cl.pagoflex.autenticacion.service.AuthService;
+import cl.pagoflex.autenticacion.service.RecuperacionContrasenaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,9 +33,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final RecuperacionContrasenaService recuperacionContrasenaService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService,
+                          RecuperacionContrasenaService recuperacionContrasenaService) {
         this.authService = authService;
+        this.recuperacionContrasenaService = recuperacionContrasenaService;
     }
 
     @PostMapping("/registro")
@@ -46,6 +53,20 @@ public class AuthController {
     @Operation(summary = "Iniciar sesión y obtener JWT")
     public ResponseEntity<AuthResponseDTO> login(@Valid @RequestBody LoginRequestDTO request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    @PostMapping("/recuperacion/solicitar")
+    @Operation(summary = "Solicitar recuperacion de contraseña")
+    public ResponseEntity<RespuestaRecuperacionDTO> solicitarRecuperacion(
+            @Valid @RequestBody SolicitudRecuperacionDTO request) {
+        return ResponseEntity.ok(recuperacionContrasenaService.solicitar(request));
+    }
+
+    @PostMapping("/recuperacion/cambiar")
+    @Operation(summary = "Cambiar contraseña usando el codigo de recuperacion")
+    public ResponseEntity<RespuestaRecuperacionDTO> cambiarContrasena(
+            @Valid @RequestBody CambioContrasenaRecuperacionDTO request) {
+        return ResponseEntity.ok(recuperacionContrasenaService.cambiar(request));
     }
 
     @GetMapping("/validar")
